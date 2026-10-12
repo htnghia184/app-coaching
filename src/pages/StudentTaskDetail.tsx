@@ -20,6 +20,7 @@ import {
   uploadCoachingFile,
 } from '../lib/coachingService';
 import { formatDate, formatDateTime } from '../lib/format';
+import { useOnlineStatus } from '../lib/useOnlineStatus';
 import type { CoachingTask, Submission, SubmissionRevision } from '../lib/types';
 import { SubmissionBadge } from '../components/StatusBadge';
 import { AttachmentLink } from '../components/AttachmentLink';
@@ -39,6 +40,7 @@ const TASK_TYPE_LABEL: Record<string, string> = {
 export function StudentTaskDetail() {
   const { taskId } = useParams<{ taskId: string }>();
   const { profile } = useAuth();
+  const online = useOnlineStatus();
 
   const [task, setTask] = useState<CoachingTask | null>(null);
   const [submission, setSubmission] = useState<Submission | null>(null);
@@ -168,6 +170,12 @@ export function StudentTaskDetail() {
     if (!task || !profile) return;
     setSaveErr('');
     setSaveMsg('');
+
+    // Lưu/nộp đều cần Supabase (upload private storage + INSERT/RPC).
+    if (!online) {
+      setSaveErr('Bạn đang ngoại tuyến. Vui lòng kết nối mạng để lưu nháp hoặc nộp bài.');
+      return;
+    }
 
     if (submit) {
       if (task.task_type === 'text' && !textResponse.trim()) {
@@ -423,11 +431,11 @@ export function StudentTaskDetail() {
 
         {/* Hành động */}
         {!locked ? (
-          <div className="mt-5 flex flex-wrap gap-3">
+          <div className="mt-5 flex flex-wrap items-center gap-3">
             <button
               type="button"
               onClick={() => void persist(true)}
-              disabled={saving || recording}
+              disabled={saving || recording || !online}
               className="inline-flex items-center gap-2 rounded-lg bg-master px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-master-dark disabled:opacity-60"
             >
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
@@ -436,11 +444,16 @@ export function StudentTaskDetail() {
             <button
               type="button"
               onClick={() => void persist(false)}
-              disabled={saving || recording}
+              disabled={saving || recording || !online}
               className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-100 disabled:opacity-60"
             >
               <Save className="h-4 w-4" /> Lưu nháp
             </button>
+            {!online ? (
+              <span className="text-xs text-amber-600">
+                Cần kết nối mạng để nộp bài hoặc lưu nháp.
+              </span>
+            ) : null}
           </div>
         ) : (
           <div className="mt-5 inline-flex items-center gap-1.5 text-sm text-slate-400">
