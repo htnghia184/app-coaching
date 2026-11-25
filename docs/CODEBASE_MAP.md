@@ -31,6 +31,8 @@ Implementation commit `ee5199d` adds `src/modules/ree.ts` (source-traceable publ
 
 Follow-up commit `bbfe0d1` adds `src/modules/history.ts` and task-level evidence loading so a Verify retry can view prior Discover/Apply recordings while requiring a new Verify recording from the current attempt.
 
+Review response commit `b3b70f4dc7ef4badab0802f2ebc54d1025ef52bc` adds `src/modules/activityValidation.ts`, `reviewEvidence.ts`, `recordingSave.ts`, and `src/lib/coachingStoragePath.ts`. `ModulePlayer.tsx` now reads only the current attempt plus its declared inherited source; `CoachModuleReview.tsx` labels those evidence sources and requires audio-duration confirmation. `docs/proposed/ielts_module_engine.sql` remains unapplied and now pins private keys to content version, validates REE payloads and stage order, and requires attempt-scoped audio paths.
+
 ## Documentation boundary
 Local project documentation supplied by product owner (master context, decision log, backlog, pilot, Trae task, dated audits) is **not automatically synced to GitHub**. The existing technical source documents are present under `docs/`: `00_READ_ME_FIRST.md`, `ARCHITECTURE_V1.md`, `DATABASE_V1.md`, `VERTICAL_SLICE_01.md`, and `PRODUCT_SPEC_V1.md — E-Master Personal Coaching.md`. Follow `docs/00_READ_ME_FIRST.md` for precedence and task-based reading. The root-path 404s in the initial inspection were path errors, not missing documentation.
 
