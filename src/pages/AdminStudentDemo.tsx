@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { reeManifest, STAGES, type Stage } from '../modules/ree';
+import { LearningModulePreview } from '../modules/LearningModulePreview';
+import { pilotLearningModule } from '../modules/pilotLearningModule';
 
 type ResponseMap = Record<string, unknown>;
 type Recording = { url: string; seconds: number };
@@ -24,6 +26,7 @@ export function AdminStudentDemo() {
   const [questionIndex, setQuestionIndex] = useState(0);
   const [learnTab, setLearnTab] = useState(0);
   const [showLearnNotes, setShowLearnNotes] = useState(false);
+  const [genericView, setGenericView] = useState(false);
   const stage = STAGES[step];
   const next = () => {
     setCompleted((old) => old.includes(stage) ? old : [...old, stage]);
@@ -75,11 +78,13 @@ export function AdminStudentDemo() {
     setQuestionIndex((old) => old + 1);
   };
 
+  if (genericView) return <div className="min-h-screen bg-[#f3f6fb]"><div className="mx-auto max-w-5xl px-4 pt-6"><button type="button" onClick={() => setGenericView(false)} className="rounded-xl bg-white px-5 py-3 text-sm font-semibold text-[#2A4272] shadow-sm">← Back to pilot experience</button></div><LearningModulePreview module={pilotLearningModule} /></div>;
+
   return <div className="min-h-screen bg-[#f3f6fb] pb-24 text-slate-800">
     <div className="mx-auto max-w-6xl px-4 py-6 sm:px-8">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <Link to="/admin/modules" className="text-sm font-semibold text-[#2A4272] hover:underline">← Quản lý module</Link>
-        <span className="rounded-full border border-amber-200 bg-amber-50 px-4 py-2 text-xs font-bold uppercase tracking-wider text-amber-800">● Demo · Không lưu dữ liệu</span>
+        <div className="flex flex-wrap items-center gap-2"><button type="button" onClick={() => setGenericView(true)} className="rounded-full bg-[#2A4272] px-4 py-2 text-xs font-bold text-white">Try generic module renderer →</button><span className="rounded-full border border-amber-200 bg-amber-50 px-4 py-2 text-xs font-bold uppercase tracking-wider text-amber-800">● Demo · Không lưu dữ liệu</span></div>
       </div>
       <div className="overflow-hidden rounded-[28px] bg-[#192f57] text-white shadow-xl">
         <div className="relative overflow-hidden px-6 py-8 sm:px-10 sm:py-10">
