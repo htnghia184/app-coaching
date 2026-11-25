@@ -81,3 +81,15 @@ Correction to earlier notes: any statement that **all** Learn stages require vid
 ## Owner-confirmed REE media mapping (2026-11-25)
 
 The product owner explicitly identifies `ielts-s-p1-m02 with audio.mp4` as the Learn video for REE / Simple Answer Development (Part 1), module UUID `eaab8a50-243b-4ea6-a8d4-59c58120ef01`. Source: SharePoint `Motion graphic` folder, item `01DMRTO52LYB7KY6EG7BGLKVPPBWNY5QS7`. This overrides the earlier unmapped status **for m02 only**. The manifest now records the source video with `verified: false` until playback, permissions and embedded example audio are QA-checked. The student Learn screen offers an explicit SharePoint link (may require login); this is **not yet an in-app video player or guaranteed student access**. Do not use the SharePoint browser URL as a direct HTML5 video source without testing. M03 and M04 remain unassigned. No universal Learn-video requirement is introduced.
+
+## Approved media hosting decision: YouTube-first pilot (2026-11-25)
+
+**APPROVED by product owner.** For the initial 12-module IELTS Coaching pilot, use **YouTube** as the default host for instructional video when a module actually needs video. Use **Unlisted** for lesson-specific video and optionally Public for reusable marketing/educational clips. **Do not assume every Learn stage requires video**: choose text, diagrams, interaction, video, audio, or combinations according to each module's learning objectives.
+
+- Keep original MP4 source files backed up on SharePoint. Upload approved videos to E-Master's YouTube channel and capture the actual YouTube video ID; do not fabricate IDs or claim the REE m02 video is uploaded before it is.
+- Store a provider-neutral media reference in module metadata/JSON (provider, external ID, media type, stage, required flag and optional source provenance). The database stores only references/metadata, **not video bytes**. Make the renderer support YouTube embed now and allow a future provider switch without rewriting lesson content.
+- Embed YouTube in the authenticated student Learn experience, after authorization/enrollment checks. Unlisted is **not DRM or access control**: the video URL/ID can be shared and watched outside the LMS. Do not promise anti-download, anti-sharing, or private playback.
+- Keep answer keys, grading logic, recordings, learner progress, coach feedback, and enrollment protected by server authorization/RLS independently of YouTube. Never include private keys in public module JSON.
+- Do not build paid video streaming, signed playback URLs, or DRM for the pilot. Reconsider only if commercial scale, abuse or content sensitivity justifies it.
+- Current REE video source is SharePoint `ielts-s-p1-m02 with audio.mp4` (owner-confirmed); its **YouTube ID is still pending**. Existing SharePoint link is an interim source reference, not proof of YouTube integration or verified student playback.
+- This is an **architecture decision**, not a claim that YouTube upload, Admin media editor, or YouTube embed player have already shipped. Keep the feature PR in Draft until separately approved and tested.
