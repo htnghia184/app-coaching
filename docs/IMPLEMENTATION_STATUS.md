@@ -82,6 +82,12 @@ Counts from E-Master Supabase project `ypsggndvjzquionaapjs`, without fetching l
 
 ## IELTS engine implementation — feature branch, 2026-11-25
 
+### Admin inventory sprint, 2026-11-25
+
+At feature HEAD after merging `origin/main` (security hotfix), the admin route `/admin/modules` lists IELTS module metadata and version/status, previews the six REE stages and learning outcome, and displays publication blockers. It performs no publication or content mutation. The published-version protection remains in the proposed SQL trigger. The local database contains one **synthetic published REE fixture** with two private key sets and 21 attempts; this does not establish content readiness because two Learn audio assets and rendered Word review are missing. The existing coach picker only offers published REE; the student player, retry, rubric, and mastery paths remain unchanged.
+
+Local-only regression during this sprint: `npm run typecheck` PASS; `npm run test:modules` 11/11 PASS; `npm run build` PASS (chunk-size warning); TEMP IELTS integration harness 111/111 PASS; TEMP Storage/Auth harness 29/29 PASS. The TEMP harnesses create synthetic local accounts and records. Browser-rendered admin UI and authenticated production flows remain NOT TESTED. Current SQL publication trigger checks versioned private key presence but not audio/source review; release publication remains BLOCKED until those gates have a trusted workflow.
+
 Base `main` SHA `e7f3bd460d0f7880fb56543580d5c6bb69f96bea`; implementation commit `ee5199d` on `codex/ielts-module-engine`. Issue #2 clarifications and the Simple Answer Development Word source were read. Source-present: six-stage player/progress UI, REE public manifest, MCQ/matching interactions, separate audio recordings, reflection checklist, coach rubric UI, secure service boundary and proposed SQL for durable attempts, private keys, RLS and review integration. Module is seeded unpublished in the **proposal only**.
 
 Tests at implementation commit: `npm run typecheck` PASS; `npm run test:modules` PASS (2 tests); `npm run build` PASS (Vite chunk-size warning). `git diff --cached --check` PASS before commit. No authenticated browser E2E, SQL migration execution, Supabase role/RLS test, mobile recording QA, screenshot, preview deployment or production deployment was performed. This is **not** a claim of live functional acceptance.

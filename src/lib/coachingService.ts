@@ -253,7 +253,31 @@ export async function createTask(input: CreateTaskInput): Promise<CoachingTask> 
   return data as CoachingTask;
 }
 
-/** Published module metadata only; source answers never live in this table. */
+/** Module metadata only; source answers never live in this table. */
+export interface LearningModuleSummary {
+  id: string;
+  title: string;
+  description: string;
+  program: string;
+  skill: string | null;
+  level: string | null;
+  content: Record<string, unknown>;
+  estimated_minutes: number | null;
+  is_published: boolean;
+}
+
+/** Admin-only inventory. RLS is the authority for access to drafts. */
+export async function listIeltsModulesForAdmin(): Promise<LearningModuleSummary[]> {
+  const { data, error } = await supabase
+    .from('learning_modules')
+    .select('id,title,description,program,skill,level,content,estimated_minutes,is_published')
+    .eq('program', 'IELTS')
+    .order('title');
+  if (error) fail(error);
+  return (data ?? []) as LearningModuleSummary[];
+}
+
+/** Published module metadata for the coach assignment picker. */
 export async function listPublishedModules(): Promise<{ id: string; title: string }[]> {
   const { data, error } = await supabase
     .from('learning_modules')
