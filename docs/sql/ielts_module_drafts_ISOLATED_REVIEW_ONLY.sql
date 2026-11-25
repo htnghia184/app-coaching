@@ -38,6 +38,12 @@ create policy "ielts drafts admin insert" on public.ielts_module_drafts
     and manifest ? 'stages'
     and manifest -> 'stages' = '["Discover","Learn","Practice","Apply","Reflect","Verify"]'::jsonb
     and not (manifest ?| array['answerKey','answer_key','correct','explanation','gradingKey','privateKey'])
+    and not jsonb_path_exists(manifest, '$.**.answerKey')
+    and not jsonb_path_exists(manifest, '$.**.answer_key')
+    and not jsonb_path_exists(manifest, '$.**.correct')
+    and not jsonb_path_exists(manifest, '$.**.explanation')
+    and not jsonb_path_exists(manifest, '$.**.gradingKey')
+    and not jsonb_path_exists(manifest, '$.**.privateKey')
   );
 -- No UPDATE/DELETE policies. Version changes must create a new Draft version.
 -- No publish operation is provided by this draft.
