@@ -183,8 +183,7 @@ export const reeManifest: ModuleManifest = {
   mastery: { minimumScore: 6, noZero: true, minSeconds: 20, maxSeconds: 30 },
   assets: [],
   missingAssets: [
-    { id: 'learn-audio-music', stage: 'Learn', description: 'Audio mẫu bản “Sau” cho Do you like listening to music? (~22–27 giây)' },
-    { id: 'learn-audio-literature', stage: 'Learn', description: 'Audio mẫu bản “Sau” cho Which subject do you enjoy learning the most at school? (~22–27 giây)' },
+    { id: 'learn-video-ree', stage: 'Learn', description: 'Video Learn hoàn chỉnh có tích hợp cả hai audio ví dụ (music và literature); cần gắn URL và xác nhận nội dung video trước khi Publish.' },
   ],
 };
 
