@@ -2,12 +2,13 @@
 
 ## Source of truth and authority
 - GitHub repository `htnghia184/app-coaching` is the implementation source of truth. Check branch/commit SHA before work.
-- Product decisions live in the separate E-Master Coaching project documents: `00_MASTER_CONTEXT.md`, `01_DECISION_LOG.md`, `BACKLOG.md`, `PILOT_10_LEARNERS.md`. These are NOT assumed to be committed in this repository. Request the latest versions if unavailable; do not invent their contents.
+- Product intent and historical implementation contracts also live in this repo under `docs/PRODUCT_SPEC_V1.md — E-Master Personal Coaching.md`, `docs/ARCHITECTURE_V1.md`, `docs/DATABASE_V1.md`, and `docs/VERTICAL_SLICE_01.md`. The existing `docs/00_READ_ME_FIRST.md` defines their precedence; historical technical statements are not proof of current live state.
+- Latest product decisions live in the separate E-Master Coaching project documents: `00_MASTER_CONTEXT.md`, `01_DECISION_LOG.md`, `BACKLOG.md`, `PILOT_10_LEARNERS.md`. These are NOT assumed to be committed in this repository. Request the latest versions if unavailable; do not invent their contents.
 - Current product direction in the supplied 2026-11-17 handoff: IELTS-only pilot, 10 paying learners commercial gate, and a separate 12-micro-module production target (original due date 2026-11-23, current completion unverified). Confirm any changes with product owner.
 - HQ/ChatGPT reviews and coordinates; Trae/local developer owns app implementation unless product owner explicitly changes responsibilities. Never silently modify production or merge to main.
 
 ## Read efficiently
-1. Read this file, `README.md`, `docs/CODEBASE_MAP.md`, and `docs/IMPLEMENTATION_STATUS.md`.
+1. Read this file, then `docs/00_READ_ME_FIRST.md` (the existing mandatory task router), `docs/CODEBASE_MAP.md`, and `docs/IMPLEMENTATION_STATUS.md`. Follow the task-specific reading matrix in `docs/00_READ_ME_FIRST.md`; do not preload every spec.
 2. Check current HEAD and changed files since the last known commit.
 3. Open only the affected components, services, types, and tests. Expand scope for cross-cutting changes or stale documentation.
 4. Distinguish documented design, code present, test passed, deployment observed, and production DB verified.
