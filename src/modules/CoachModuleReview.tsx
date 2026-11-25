@@ -3,7 +3,7 @@ import type { Submission, SubmissionRevision } from '../lib/types';
 import { RevisionHistory } from '../components/RevisionHistory';
 import { SavedRecording } from './AudioPrompt';
 import {
-  getAttemptForSubmission, listModuleRecordings, reviewModuleSubmission,
+  getAttemptForSubmission, listRecordingHistoryForTask, reviewModuleSubmission,
   type ModuleAttempt, type ModuleRecording,
 } from './moduleService';
 import { reeManifest } from './ree';
@@ -29,7 +29,7 @@ export function CoachModuleReview({ submission, revisions, onChanged }: {
       .then(async (found) => {
         if (!active) return;
         setAttempt(found);
-        setRecordings(found ? await listModuleRecordings(found.id) : []);
+        setRecordings(found ? await listRecordingHistoryForTask(found.task_id) : []);
         const previous = submission.feedback_data?.criteria;
         if (previous && typeof previous === 'object') {
           setScores(previous as Record<string, number>);

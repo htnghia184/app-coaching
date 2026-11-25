@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { reeManifest, STAGES, validateModuleManifest } from '../src/modules/ree.ts';
+import { latestCurrentRecording, latestRecording } from '../src/modules/history.ts';
 
 test('REE manifest matches source structure and has no leaked keys', () => {
   assert.deepEqual(validateModuleManifest(reeManifest), []);
@@ -29,4 +30,15 @@ test('manifest validator rejects a video in Discover and missing provenance', ()
   const errors = validateModuleManifest(changed);
   assert.ok(errors.includes('Video lessons belong in Learn only'));
   assert.ok(errors.includes('Missing identity or source'));
+});
+
+test('Verify retry cannot reuse a prior attempt recording', () => {
+  const recordings = [
+    { id: 'old', attempt_id: 'attempt-1', prompt_id: 'verify', storage_path: 'old.webm' },
+    { id: 'baseline', attempt_id: 'attempt-1', prompt_id: 'discover', storage_path: 'baseline.webm' },
+  ];
+  assert.equal(latestRecording(recordings, 'discover')?.id, 'baseline');
+  assert.equal(latestCurrentRecording(recordings, 'verify', 'attempt-2'), undefined);
+  recordings.push({ id: 'new', attempt_id: 'attempt-2', prompt_id: 'verify', storage_path: 'new.webm' });
+  assert.equal(latestCurrentRecording(recordings, 'verify', 'attempt-2')?.id, 'new');
 });

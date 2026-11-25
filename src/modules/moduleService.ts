@@ -83,6 +83,26 @@ export async function listActivityAttempts(attemptId: string): Promise<ActivityA
   return unwrap<ActivityAttempt[]>(result);
 }
 
+export async function listModuleAttemptsForTask(taskId: string): Promise<ModuleAttempt[]> {
+  const result = await supabase
+    .from('coaching_module_attempts')
+    .select('*')
+    .eq('task_id', taskId)
+    .order('attempt_number', { ascending: true });
+  return unwrap<ModuleAttempt[]>(result);
+}
+
+export async function listActivityHistoryForTask(taskId: string): Promise<ActivityAttempt[]> {
+  const attempts = await listModuleAttemptsForTask(taskId);
+  if (attempts.length === 0) return [];
+  const result = await supabase
+    .from('coaching_module_activity_attempts')
+    .select('*')
+    .in('attempt_id', attempts.map((item) => item.id))
+    .order('created_at', { ascending: true });
+  return unwrap<ActivityAttempt[]>(result);
+}
+
 export async function saveModuleRecording(
   attemptId: string,
   promptId: string,
@@ -104,6 +124,17 @@ export async function listModuleRecordings(attemptId: string): Promise<ModuleRec
     .from('coaching_module_recordings')
     .select('*')
     .eq('attempt_id', attemptId)
+    .order('created_at', { ascending: true });
+  return unwrap<ModuleRecording[]>(result);
+}
+
+export async function listRecordingHistoryForTask(taskId: string): Promise<ModuleRecording[]> {
+  const attempts = await listModuleAttemptsForTask(taskId);
+  if (attempts.length === 0) return [];
+  const result = await supabase
+    .from('coaching_module_recordings')
+    .select('*')
+    .in('attempt_id', attempts.map((item) => item.id))
     .order('created_at', { ascending: true });
   return unwrap<ModuleRecording[]>(result);
 }

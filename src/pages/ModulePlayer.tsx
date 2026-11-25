@@ -8,8 +8,9 @@ import { RevisionHistory } from '../components/RevisionHistory';
 import { Spinner } from '../components/Spinner';
 import { AudioPrompt, SavedRecording } from '../modules/AudioPrompt';
 import { InteractionRegistry } from '../modules/InteractionRegistry';
+import { latestActivity, latestCurrentRecording, latestRecording } from '../modules/history';
 import {
-  listActivityAttempts, listModuleRecordings, saveModuleProgress, startModuleAttempt,
+  listActivityHistoryForTask, listRecordingHistoryForTask, saveModuleProgress, startModuleAttempt,
   submitActivity, submitModuleVerify,
   type ActivityAttempt, type ModuleAttempt, type ModuleRecording,
 } from '../modules/moduleService';
@@ -17,14 +18,6 @@ import { reeManifest, REE_MODULE_ID, STAGES, type Stage } from '../modules/ree';
 
 type McqResponse = Record<string, { choice: string; stage: string }>;
 type MatchingResponse = Record<string, { explain: string; example: string }>;
-
-function latestRecording(items: ModuleRecording[], promptId: string): ModuleRecording | undefined {
-  return [...items].reverse().find((item) => item.prompt_id === promptId);
-}
-
-function latestActivity(items: ActivityAttempt[], activityId: string): ActivityAttempt | undefined {
-  return [...items].reverse().find((item) => item.activity_id === activityId);
-}
 
 const stageLabel: Record<Stage, string> = {
   Discover: 'Khám phá',
@@ -58,7 +51,7 @@ export function ModulePlayer() {
 
   const refreshEvidence = useCallback(async (current: ModuleAttempt) => {
     const [savedActivities, savedRecordings] = await Promise.all([
-      listActivityAttempts(current.id), listModuleRecordings(current.id),
+      listActivityHistoryForTask(current.task_id), listRecordingHistoryForTask(current.task_id),
     ]);
     setActivities(savedActivities);
     setRecordings(savedRecordings);
@@ -81,8 +74,8 @@ export function ModulePlayer() {
         throw new Error('Phiên bản nội dung của lượt học chưa có trong ứng dụng này.');
       }
       const [savedActivities, savedRecordings, savedRevisions] = await Promise.all([
-        listActivityAttempts(loadedAttempt.id),
-        listModuleRecordings(loadedAttempt.id),
+        listActivityHistoryForTask(taskId),
+        listRecordingHistoryForTask(taskId),
         loadedSubmission ? listSubmissionRevisions([loadedSubmission.id]) : Promise.resolve([]),
       ]);
       if (!active) return;
@@ -151,7 +144,7 @@ export function ModulePlayer() {
 
   const submitVerify = async () => {
     if (!attempt || !task || !profile) return;
-    const recording = latestRecording(recordings, 'verify');
+    const recording = latestCurrentRecording(recordings, 'verify', attempt.id);
     if (!recording) { setError('Vui lòng ghi âm và lưu câu trả lời Verify.'); return; }
     setBusy(true); setError('');
     try {
@@ -364,7 +357,7 @@ export function ModulePlayer() {
             <p className="font-semibold text-master">Điều kiện đạt</p>
             <p className="mt-1">Từ 6/8 điểm trở lên, không tiêu chí nào bằng 0, và bản ghi Verify dài 20–30 giây. Coach quyết định cuối cùng.</p>
           </div>
-          {canEdit && <NextButton disabled={busy || !latestRecording(recordings,'verify')} onClick={() => void submitVerify()}>Nộp Verify cho coach</NextButton>}
+          {canEdit && <NextButton disabled={busy || !latestCurrentRecording(recordings,'verify',attempt.id)} onClick={() => void submitVerify()}>Nộp Verify cho coach</NextButton>}
           {submission?.feedback_text && <div className="mt-4 rounded-xl bg-emerald-50 p-4 text-sm">
             <p className="font-semibold text-master">Phản hồi của coach</p>
             <p className="mt-2 whitespace-pre-wrap">{submission.feedback_text}</p>
