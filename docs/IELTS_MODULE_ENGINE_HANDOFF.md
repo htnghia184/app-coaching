@@ -62,3 +62,12 @@ Do this only on an approved test environment first. Verify a student can retriev
 **Engineering priorities:** (a) define the reusable data-driven manifest/schema and dynamic player boundary; (b) implement Admin JSON import, Draft edit and true student-view preview; (c) implement secure private key import and server-side publish validation; (d) add version cloning and verified media selection. Do not build a complex visual drag-and-drop editor for the initial 12-module pilot. A richer visual editor, question bank and bulk asset management can follow once module volume justifies them.
 
 **Release discipline:** Develop/test against Supabase Local or an explicitly approved isolated environment. Do not apply production migrations, publish incomplete modules, merge this draft PR, or deploy without separate approval. Browser/mobile E2E remains required.
+
+## Media inventory check (2026-11-25)
+
+The SharePoint project site `/sites/E-MasterLanguagesCenter-Micro-ModuleIELTSCoachingProject` has a `Motion graphic` folder with these existing video files:
+- `ielts-s-p1-m02 with audio.mp4` (18,386,880 bytes)
+- `ielts-s-p1-m03_2026-11-14_20-44-21 with audio.mp4` (17,749,570 bytes)
+- `ielts-s-p1-m04_v1 with audio.mp4` (24,022,742 bytes)
+
+These are real existing SharePoint assets, but **none has been confirmed as the Learn video for REE / Simple Answer Development (Part 1)**. Their `m02/m03/m04` identifiers alone are insufficient to map them to the REE module; a source mapping or content verification is required. The available connector listing confirms filenames and file metadata, not the audiovisual contents. Do not mark them verified or bypass the Learn video publication gate merely because files exist. Once the correct file is identified, use an authenticated/authorized playback URL or a supported private media delivery path (not an untested SharePoint browser page URL) and verify student access on mobile.
