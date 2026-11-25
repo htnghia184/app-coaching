@@ -8,13 +8,92 @@ revoke all on schema coaching_private from public, anon, authenticated;
 
 create table if not exists coaching_private.module_answer_keys (
   module_id uuid not null references public.learning_modules(id) on delete restrict,
+  content_version integer not null check (content_version > 0),
   activity_id text not null,
   answer jsonb not null,
   explanations jsonb not null,
-  primary key (module_id, activity_id)
+  primary key (module_id, content_version, activity_id)
 );
 alter table coaching_private.module_answer_keys enable row level security;
 revoke all on coaching_private.module_answer_keys from public, anon, authenticated;
+
+-- Only unpublished versions accept key imports. Historical scoring must remain stable.
+create or replace function coaching_private.protect_module_answer_key()
+returns trigger language plpgsql set search_path = ''
+as $$
+declare
+  v_module public.learning_modules;
+begin
+  select * into v_module from public.learning_modules
+  where id = case when tg_op = 'DELETE' then old.module_id else new.module_id end;
+  if v_module.is_published then
+    raise exception 'Published answer keys are immutable';
+  end if;
+  if tg_op = 'UPDATE' and exists (
+    select 1 from public.learning_modules where id = old.module_id and is_published
+  ) then raise exception 'Published answer keys are immutable'; end if;
+  if tg_op <> 'DELETE' and (new.content_version <> (v_module.content->>'content_version')::integer
+    or new.activity_id not in ('ree-mcq','ree-matching')) then
+    raise exception 'Answer key does not match module version or activity';
+  end if;
+  if tg_op = 'UPDATE' and (old.module_id,old.content_version,old.activity_id)
+    is distinct from (new.module_id,new.content_version,new.activity_id) then
+    raise exception 'Answer key identity is immutable';
+  end if;
+  if tg_op <> 'DELETE' and (
+    not coaching_private.valid_ree_response(new.activity_id,new.answer) or
+    pg_catalog.jsonb_typeof(new.explanations) is distinct from 'object' or
+    (select count(*) from pg_catalog.jsonb_object_keys(new.explanations)) <>
+      case new.activity_id when 'ree-mcq' then 6 else 4 end or
+    exists (select 1 from pg_catalog.jsonb_each_text(new.explanations) e
+      where not new.answer ? e.key or pg_catalog.btrim(e.value) = '')
+  ) then raise exception 'Invalid private key payload'; end if;
+  if tg_op = 'DELETE' then return old; end if;
+  return new;
+end $$;
+create trigger protect_module_answer_key_trigger
+before insert or update or delete on coaching_private.module_answer_keys
+for each row execute function coaching_private.protect_module_answer_key();
+
+-- This checks shape and option IDs only. Correct answers remain in the private table.
+create or replace function coaching_private.valid_ree_response(p_activity_id text, p_response jsonb)
+returns boolean language plpgsql immutable set search_path = ''
+as $$
+declare
+  v_item jsonb;
+  v_id text;
+  v_explains text[] := '{}';
+  v_examples text[] := '{}';
+  v_expected integer;
+begin
+  v_expected := case p_activity_id when 'ree-mcq' then 6 when 'ree-matching' then 4 else 0 end;
+  if v_expected = 0 or pg_catalog.jsonb_typeof(p_response) <> 'object' or
+    (select count(*) from pg_catalog.jsonb_object_keys(p_response)) <> v_expected then return false; end if;
+  for v_id in select generate_series(1,v_expected)::text loop
+    v_item := p_response->v_id;
+    if pg_catalog.jsonb_typeof(v_item) <> 'object' or
+      (select count(*) from pg_catalog.jsonb_object_keys(v_item)) <> 2 then return false; end if;
+    if p_activity_id = 'ree-mcq' then
+      if pg_catalog.jsonb_typeof(v_item->'choice') is distinct from 'string' or
+        v_item->>'choice' not in ('A','B','C') or
+        pg_catalog.jsonb_typeof(v_item->'stage') is distinct from 'string' or
+        v_item->>'stage' not in ('Explain','Example') then return false; end if;
+    else
+      if pg_catalog.jsonb_typeof(v_item->'explain') is distinct from 'string' or
+        v_item->>'explain' not in ('A','B','C','D') or
+        pg_catalog.jsonb_typeof(v_item->'example') is distinct from 'string' or
+        v_item->>'example' not in ('i','ii','iii','iv') then return false; end if;
+      v_explains := array_append(v_explains,v_item->>'explain');
+      v_examples := array_append(v_examples,v_item->>'example');
+    end if;
+  end loop;
+  if p_activity_id = 'ree-matching' and
+    ((select count(distinct value) from unnest(v_explains) as value) <> 4 or
+     (select count(distinct value) from unnest(v_examples) as value) <> 4) then return false; end if;
+  return true;
+end $$;
+revoke all on function coaching_private.valid_ree_response(text,jsonb),
+  coaching_private.protect_module_answer_key() from public, anon, authenticated;
 
 create table if not exists public.coaching_module_attempts (
   id uuid primary key default gen_random_uuid(),
@@ -23,6 +102,7 @@ create table if not exists public.coaching_module_attempts (
   content_version integer not null check (content_version > 0),
   student_id uuid not null references public.profiles(id) on delete restrict,
   attempt_number integer not null check (attempt_number > 0),
+  inherited_evidence_attempt_id uuid references public.coaching_module_attempts(id) on delete restrict,
   resume_stage text not null default 'Discover'
     check (resume_stage in ('Discover','Learn','Practice','Apply','Reflect','Verify')),
   completed_stages text[] not null default '{}',
@@ -148,11 +228,14 @@ begin
     return v_previous;
   end if;
   insert into public.coaching_module_attempts
-    (task_id,module_id,content_version,student_id,attempt_number,resume_stage,completed_stages,stage_data)
+    (task_id,module_id,content_version,student_id,attempt_number,inherited_evidence_attempt_id,resume_stage,completed_stages,stage_data)
   values (
-    p_task_id,v_task.module_id,
-    (select (m.content->>'content_version')::integer from public.learning_modules m where m.id = v_task.module_id),
+    p_task_id,case when v_previous.id is null then v_task.module_id else v_previous.module_id end,
+    case when v_previous.id is null then
+      (select (m.content->>'content_version')::integer from public.learning_modules m where m.id = v_task.module_id)
+      else v_previous.content_version end,
     auth.uid(),coalesce(v_previous.attempt_number,0)+1,
+    case when v_previous.id is null then null else coalesce(v_previous.inherited_evidence_attempt_id,v_previous.id) end,
     case when v_previous.id is null then 'Discover' else 'Verify' end,
     case when v_previous.id is null then '{}'::text[] else
       array_remove(v_previous.completed_stages, 'Verify') end,
@@ -178,14 +261,45 @@ begin
   if v_attempt.id is null or public.get_user_role() <> 'student' then
     raise exception 'Module attempt not editable';
   end if;
+  if p_complete is null then raise exception 'Completion decision required'; end if;
   v_index := array_position(v_stages,p_stage);
   if v_index is null or p_stage = 'Verify' or
      v_index > coalesce(array_position(v_stages,v_attempt.resume_stage),1) then
     raise exception 'Stage unavailable';
   end if;
+  if p_stage = any(v_attempt.completed_stages) then
+    raise exception 'Completed stage is immutable';
+  end if;
+  if v_index > 1 and not v_attempt.completed_stages @> v_stages[1:v_index-1] then
+    raise exception 'Earlier stages incomplete';
+  end if;
   if pg_catalog.octet_length(coalesce(p_data,'{}'::jsonb)::text) > 65536 then
     raise exception 'Stage data too large';
   end if;
+  if pg_catalog.jsonb_typeof(p_data) <> 'object' then
+    raise exception 'Stage data must be an object';
+  end if;
+  if p_stage in ('Discover','Learn','Apply') and not p_complete then
+    raise exception 'This stage requires explicit completion';
+  end if;
+  if p_stage in ('Discover','Apply') and p_data <> '{}'::jsonb or
+     p_stage = 'Learn' and p_data <> '{"acknowledged":true}'::jsonb or
+     p_stage = 'Reflect' and (
+       not p_data ? 'checklist' or
+       (select count(*) from pg_catalog.jsonb_object_keys(p_data)) <> 2 or
+       p_data->'reviewed' is distinct from pg_catalog.to_jsonb(p_complete)
+     ) then raise exception 'Invalid stage data'; end if;
+  if p_stage = 'Practice' and (
+    (select count(*) from pg_catalog.jsonb_object_keys(p_data)) <> 2 or
+    pg_catalog.jsonb_typeof(p_data->'mcq') is distinct from 'object' or
+    pg_catalog.jsonb_typeof(p_data->'matching') is distinct from 'object'
+  ) then raise exception 'Invalid Practice draft'; end if;
+  if p_stage = 'Reflect' and (
+    pg_catalog.jsonb_typeof(p_data->'checklist') <> 'array' or
+    pg_catalog.jsonb_array_length(p_data->'checklist') <> 5 or
+    exists (select 1 from pg_catalog.jsonb_array_elements(p_data->'checklist') item
+      where pg_catalog.jsonb_typeof(item) <> 'boolean')
+  ) then raise exception 'Five reflection items required'; end if;
   if p_complete then
     if p_stage = 'Discover' and not exists (
       select 1 from public.coaching_module_recordings
@@ -193,23 +307,16 @@ begin
     ) then raise exception 'Discover recording required'; end if;
     if p_stage = 'Practice' and (
       not exists (select 1 from public.coaching_module_activity_attempts
-        where attempt_id = p_attempt_id and activity_id = 'ree-mcq')
+        where attempt_id = p_attempt_id and activity_id = 'ree-mcq'
+          and coaching_private.valid_ree_response(activity_id,response))
       or not exists (select 1 from public.coaching_module_activity_attempts
-        where attempt_id = p_attempt_id and activity_id = 'ree-matching')
+        where attempt_id = p_attempt_id and activity_id = 'ree-matching'
+          and coaching_private.valid_ree_response(activity_id,response))
     ) then raise exception 'Both practice activities required'; end if;
     if p_stage = 'Apply' and (
       select count(distinct prompt_id) from public.coaching_module_recordings
       where attempt_id = p_attempt_id and prompt_id in ('apply-1','apply-2','apply-3')
     ) <> 3 then raise exception 'Three Apply recordings required'; end if;
-    if p_stage = 'Reflect' then
-      if coalesce(pg_catalog.jsonb_typeof(p_data->'checklist'),'') <> 'array' then
-        raise exception 'Five reflection items required';
-      end if;
-      if pg_catalog.jsonb_array_length(p_data->'checklist') <> 5 or
-         exists (select 1 from pg_catalog.jsonb_array_elements(p_data->'checklist') item
-           where pg_catalog.jsonb_typeof(item) <> 'boolean')
-      then raise exception 'Five reflection items required'; end if;
-    end if;
   end if;
   update public.coaching_module_attempts
   set stage_data = pg_catalog.jsonb_set(stage_data,array[p_stage],coalesce(p_data,'{}'::jsonb),true),
@@ -238,17 +345,16 @@ begin
   select * into v_attempt from public.coaching_module_attempts
   where id = p_attempt_id and student_id = auth.uid() and status = 'in_progress';
   if v_attempt.id is null or public.get_user_role() <> 'student' or
-     (v_attempt.resume_stage <> 'Practice' and
-      not 'Practice' = any(v_attempt.completed_stages)) then
+     v_attempt.resume_stage <> 'Practice' or
+     not v_attempt.completed_stages @> array['Discover','Learn']::text[] then
     raise exception 'Practice not available';
   end if;
   select * into v_key from coaching_private.module_answer_keys
-  where module_id = v_attempt.module_id and activity_id = p_activity_id;
+  where module_id = v_attempt.module_id and content_version = v_attempt.content_version
+    and activity_id = p_activity_id;
   if v_key.module_id is null then raise exception 'Activity key unavailable'; end if;
-  if pg_catalog.jsonb_typeof(p_response) <> 'object' or
-     (select count(*) from pg_catalog.jsonb_object_keys(p_response)) <>
-     (select count(*) from pg_catalog.jsonb_object_keys(v_key.answer)) then
-    raise exception 'Complete activity response required';
+  if not coaching_private.valid_ree_response(p_activity_id,p_response) then
+    raise exception 'Invalid or incomplete activity response';
   end if;
   for v_item in select key,value from pg_catalog.jsonb_each(v_key.answer) loop
     if not p_response ? v_item.key then raise exception 'Missing answer'; end if;
@@ -280,11 +386,17 @@ begin
   if v_attempt.id is null or public.get_user_role() <> 'student' then
     raise exception 'Module attempt not editable';
   end if;
+  if (p_prompt_id = 'discover' and v_attempt.resume_stage <> 'Discover') or
+     (p_prompt_id in ('apply-1','apply-2','apply-3') and v_attempt.resume_stage <> 'Apply') or
+     (p_prompt_id = 'verify' and v_attempt.resume_stage <> 'Verify') then
+    raise exception 'Recording stage unavailable';
+  end if;
   if p_prompt_id not in ('discover','apply-1','apply-2','apply-3','verify') or
      p_duration_seconds is null or p_duration_seconds <= 0 or
-     p_storage_path not like auth.uid()::text || '/' || v_attempt.task_id::text || '/%' or
+     p_storage_path not like auth.uid()::text || '/' || v_attempt.task_id::text || '/' || p_attempt_id::text || '/%' or
      not exists (select 1 from storage.objects
-       where bucket_id = 'coaching-submissions' and name = p_storage_path)
+       where bucket_id = 'coaching-submissions' and name = p_storage_path
+         and coalesce(metadata->>'mimetype','') like 'audio/%')
   then raise exception 'Invalid recording'; end if;
   insert into public.coaching_module_recordings
     (attempt_id,prompt_id,storage_path,duration_seconds)
@@ -307,6 +419,7 @@ begin
   where id = p_attempt_id and student_id = auth.uid() for update;
   if v_attempt.id is null or public.get_user_role() <> 'student' or
      v_attempt.status not in ('in_progress','awaiting_review') or
+     v_attempt.resume_stage <> 'Verify' or
      not v_attempt.completed_stages @> array['Discover','Learn','Practice','Apply','Reflect']::text[]
   then raise exception 'Required stages incomplete'; end if;
   select * into v_submission from public.coaching_submissions
@@ -318,6 +431,9 @@ begin
       and storage_path = v_submission.storage_path
       and duration_seconds = v_submission.duration_seconds
   ) then raise exception 'Verify submission and recording must match'; end if;
+  if v_attempt.verify_submission_id is not null and v_attempt.verify_submission_id <> p_submission_id then
+    raise exception 'Verify attempt already linked to another submission';
+  end if;
   update public.coaching_module_attempts set
     verify_submission_id = p_submission_id,
     status = 'awaiting_review',
@@ -331,7 +447,8 @@ begin
 end $$;
 
 create or replace function public.review_coaching_module_submission(
-  p_submission_id uuid, p_feedback_text text, p_scores jsonb, p_request_revision boolean
+  p_submission_id uuid, p_feedback_text text, p_scores jsonb,
+  p_request_revision boolean, p_duration_confirmed boolean
 ) returns public.coaching_module_attempts
 language plpgsql security definer set search_path = ''
 as $$
@@ -351,6 +468,9 @@ begin
   if p_feedback_text is null or pg_catalog.btrim(p_feedback_text) = '' then
     raise exception 'Coach feedback required';
   end if;
+  if p_duration_confirmed is distinct from true or p_request_revision is null then
+    raise exception 'Coach must verify audio duration and review decision';
+  end if;
   select * into v_attempt from public.coaching_module_attempts
   where verify_submission_id = p_submission_id and status = 'awaiting_review'
   order by attempt_number desc limit 1 for update;
@@ -362,6 +482,7 @@ begin
   then raise exception 'Invalid REE review'; end if;
   foreach v_criterion in array array['respond','explain','example','coherence'] loop
     if not p_scores ? v_criterion or
+       pg_catalog.jsonb_typeof(p_scores->v_criterion) <> 'number' or
        (p_scores->>v_criterion) !~ '^[0-2]$'
     then raise exception 'Each rubric criterion requires a score 0–2'; end if;
     v_score := (p_scores->>v_criterion)::integer;
@@ -391,14 +512,14 @@ revoke all on function public.start_coaching_module_attempt(uuid),
   public.submit_coaching_module_activity(uuid,text,jsonb),
   public.save_coaching_module_recording(uuid,text,text,integer),
   public.submit_coaching_module_verify(uuid,uuid),
-  public.review_coaching_module_submission(uuid,text,jsonb,boolean)
+  public.review_coaching_module_submission(uuid,text,jsonb,boolean,boolean)
   from public, anon;
 grant execute on function public.start_coaching_module_attempt(uuid),
   public.save_coaching_module_progress(uuid,text,jsonb,boolean),
   public.submit_coaching_module_activity(uuid,text,jsonb),
   public.save_coaching_module_recording(uuid,text,text,integer),
   public.submit_coaching_module_verify(uuid,uuid),
-  public.review_coaching_module_submission(uuid,text,jsonb,boolean)
+  public.review_coaching_module_submission(uuid,text,jsonb,boolean,boolean)
   to authenticated;
 
 -- Seed metadata only. Publication remains blocked until source review, private key
@@ -432,7 +553,9 @@ begin
   if new.is_published and new.content ? 'manifest_key' and
      (tg_op = 'INSERT' or not old.is_published) and
      (select count(*) from coaching_private.module_answer_keys k
-      where k.module_id = new.id and k.activity_id in ('ree-mcq','ree-matching')) <> 2
+      where k.module_id = new.id
+        and k.content_version = (new.content->>'content_version')::integer
+        and k.activity_id in ('ree-mcq','ree-matching')) <> 2
   then raise exception 'Private answer keys required before publication'; end if;
   return new;
 end $$;

@@ -8,6 +8,7 @@ export interface ModuleAttempt {
   content_version: number;
   student_id: string;
   attempt_number: number;
+  inherited_evidence_attempt_id: string | null;
   resume_stage: Stage;
   completed_stages: Stage[];
   stage_data: Record<string, unknown>;
@@ -169,6 +170,7 @@ export async function reviewModuleSubmission(input: {
   feedbackText: string;
   scores: Record<string, number>;
   requestRevision: boolean;
+  durationConfirmed: boolean;
 }): Promise<ModuleAttempt> {
   return unwrap<ModuleAttempt>(
     await supabase.rpc('review_coaching_module_submission', {
@@ -176,6 +178,7 @@ export async function reviewModuleSubmission(input: {
       p_feedback_text: input.feedbackText,
       p_scores: input.scores,
       p_request_revision: input.requestRevision,
+      p_duration_confirmed: input.durationConfirmed,
     })
   );
 }

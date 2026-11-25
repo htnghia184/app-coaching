@@ -2,6 +2,7 @@
 // Tất cả truy vấn dùng session của người dùng đang đăng nhập để RLS được thực thi.
 
 import { supabase } from './supabaseClient';
+import { coachingStoragePath } from './coachingStoragePath';
 import type {
   CoachingTask,
   Enrollment,
@@ -549,11 +550,12 @@ export async function uploadCoachingFile(
   studentId: string,
   taskId: string,
   file: Blob,
-  fileName: string
+  fileName: string,
+  moduleAttemptId?: string
 ): Promise<string> {
   const ext = safeExtension(fileName, file.type);
   const unique = `${Date.now()}-${crypto.randomUUID()}${ext}`;
-  const path = `${studentId}/${taskId}/${unique}`;
+  const path = coachingStoragePath(studentId, taskId, unique, moduleAttemptId);
   const { error } = await supabase.storage
     .from(COACHING_BUCKET)
     .upload(path, file, {

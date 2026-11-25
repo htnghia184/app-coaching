@@ -8,9 +8,10 @@ import { RevisionHistory } from '../components/RevisionHistory';
 import { Spinner } from '../components/Spinner';
 import { AudioPrompt, SavedRecording } from '../modules/AudioPrompt';
 import { InteractionRegistry } from '../modules/InteractionRegistry';
+import { validReeActivityResponse } from '../modules/activityValidation';
 import { latestActivity, latestCurrentRecording, latestRecording } from '../modules/history';
 import {
-  listActivityHistoryForTask, listRecordingHistoryForTask, saveModuleProgress, startModuleAttempt,
+  listActivityAttempts, listModuleRecordings, saveModuleProgress, startModuleAttempt,
   submitActivity, submitModuleVerify,
   type ActivityAttempt, type ModuleAttempt, type ModuleRecording,
 } from '../modules/moduleService';
@@ -50,11 +51,14 @@ export function ModulePlayer() {
   const initialized = useRef(false);
 
   const refreshEvidence = useCallback(async (current: ModuleAttempt) => {
-    const [savedActivities, savedRecordings] = await Promise.all([
-      listActivityHistoryForTask(current.task_id), listRecordingHistoryForTask(current.task_id),
+    const inheritedId = current.inherited_evidence_attempt_id;
+    const [savedActivities, savedRecordings, inheritedActivities, inheritedRecordings] = await Promise.all([
+      listActivityAttempts(current.id), listModuleRecordings(current.id),
+      inheritedId ? listActivityAttempts(inheritedId) : Promise.resolve([]),
+      inheritedId ? listModuleRecordings(inheritedId) : Promise.resolve([]),
     ]);
-    setActivities(savedActivities);
-    setRecordings(savedRecordings);
+    setActivities([...inheritedActivities, ...savedActivities]);
+    setRecordings([...inheritedRecordings.filter((item) => item.prompt_id !== 'verify'), ...savedRecordings]);
   }, []);
 
   useEffect(() => {
@@ -73,17 +77,20 @@ export function ModulePlayer() {
       if (loadedAttempt.content_version !== reeManifest.version) {
         throw new Error('Phiên bản nội dung của lượt học chưa có trong ứng dụng này.');
       }
-      const [savedActivities, savedRecordings, savedRevisions] = await Promise.all([
-        listActivityHistoryForTask(taskId),
-        listRecordingHistoryForTask(taskId),
+      const inheritedId = loadedAttempt.inherited_evidence_attempt_id;
+      const [savedActivities, savedRecordings, inheritedActivities, inheritedRecordings, savedRevisions] = await Promise.all([
+        listActivityAttempts(loadedAttempt.id),
+        listModuleRecordings(loadedAttempt.id),
+        inheritedId ? listActivityAttempts(inheritedId) : Promise.resolve([]),
+        inheritedId ? listModuleRecordings(inheritedId) : Promise.resolve([]),
         loadedSubmission ? listSubmissionRevisions([loadedSubmission.id]) : Promise.resolve([]),
       ]);
       if (!active) return;
       setTask(loadedTask);
       setAttempt(loadedAttempt);
       setSubmission(loadedSubmission);
-      setActivities(savedActivities);
-      setRecordings(savedRecordings);
+      setActivities([...inheritedActivities, ...savedActivities]);
+      setRecordings([...inheritedRecordings.filter((item) => item.prompt_id !== 'verify'), ...savedRecordings]);
       setRevisions(savedRevisions);
       setViewStage(loadedAttempt.resume_stage);
       const practice = loadedAttempt.stage_data.Practice as
@@ -132,6 +139,10 @@ export function ModulePlayer() {
 
   const submitPractice = async (activityId: string, response: Record<string, unknown>) => {
     if (!attempt) return;
+    if (!validReeActivityResponse(activityId, response)) {
+      setError('Hoàn thành mọi câu bằng lựa chọn hợp lệ; Bài 2 cần ghép mỗi Explain và Example đúng một lần.');
+      return;
+    }
     setBusy(true); setError(''); setMessage('');
     try {
       const saved = await submitActivity(attempt.id, activityId, response);
@@ -187,7 +198,8 @@ export function ModulePlayer() {
   );
   if (!attempt || !task || !profile) return null;
   const stageIndex = STAGES.indexOf(viewStage);
-  const canEdit = attempt.status === 'in_progress' && online;
+  const canEditStage = attempt.status === 'in_progress' && online &&
+    viewStage === attempt.resume_stage && !attempt.completed_stages.includes(viewStage);
   const canVisit = (stage: Stage) =>
     STAGES.indexOf(stage) <= STAGES.indexOf(attempt.resume_stage) ||
     attempt.completed_stages.includes(stage);
@@ -232,14 +244,15 @@ export function ModulePlayer() {
         {viewStage === 'Discover' && <>
           <p className="mb-4 text-slate-700">Bạn ghi âm một câu trả lời trước khi học, để tự thấy mình hay dừng ở chỗ nào.</p>
           <p className="mb-4 text-sm text-slate-600">Bài làm: tạm dừng, ghi âm trả lời câu hỏi sau, rồi quay lại.</p>
-          <AudioPrompt attemptId={attempt.id} taskId={task.id} studentId={profile.id}
-            promptId="discover" prompt={reeManifest.discoverPrompt} recordings={recordings}
-            onSaved={() => refreshEvidence(attempt)} />
+          {canEditStage ? <AudioPrompt attemptId={attempt.id} taskId={task.id} studentId={profile.id}
+            promptId="discover" prompt={reeManifest.discoverPrompt} recordings={recordings.filter((item) => item.attempt_id === attempt.id)}
+            onSaved={() => refreshEvidence(attempt)} /> :
+            latestRecording(recordings,'discover') && <SavedRecording recording={latestRecording(recordings,'discover')!} />}
           <p className="mt-4 text-sm text-slate-600">Nghe lại bản ghi âm và tự hỏi: mình đã đủ chi tiết chưa (có 1–2 ý mở rộng), hay trả lời xong rồi im? Giữ lại file ghi âm này, ở bước Verify bạn sẽ trả lời lại câu hỏi này để so sánh.</p>
           <p className="mt-3 text-sm text-slate-600">Vấn đề thường gặp: trả lời thẳng xong không biết nói gì thêm. Đây là chuyện rất thường gặp.</p>
           <p className="mt-2 text-sm text-slate-600">Điều cần nhớ: ở trường mình quen trả lời đúng câu hỏi, còn IELTS cần cho giám khảo thấy cách bạn nghĩ ra câu trả lời đó.</p>
           <p className="mt-2 text-sm text-slate-600">Module này dạy gì: Dùng phương pháp REE để mở rộng câu, kèm một số ngôn ngữ dùng được.</p>
-          {canEdit && <NextButton disabled={busy || !latestRecording(recordings, 'discover')} onClick={() => void progress('Discover')}>Tiếp tục đến Learn</NextButton>}
+          {canEditStage && <NextButton disabled={busy || !latestRecording(recordings, 'discover')} onClick={() => void progress('Discover')}>Tiếp tục đến Learn</NextButton>}
         </>}
 
         {viewStage === 'Learn' && <>
@@ -276,7 +289,7 @@ export function ModulePlayer() {
             <p className="mt-1 text-sm text-amber-900">Nguồn yêu cầu nghe hai bản “Sau” (~22–27 giây) cùng transcript. Transcript ở trên đã có; file audio cần được xác minh trước khi publish.</p>
           </div>
           <p className="mt-5 font-medium text-master">{reeManifest.learn.conclusion}</p>
-          {canEdit && <NextButton disabled={busy} onClick={() => void progress('Learn')}>Tiếp tục đến Practice</NextButton>}
+          {canEditStage && <NextButton disabled={busy} onClick={() => void progress('Learn', { acknowledged: true })}>Tiếp tục đến Practice</NextButton>}
         </>}
 
         {viewStage === 'Practice' && <>
@@ -286,8 +299,8 @@ export function ModulePlayer() {
           <InteractionRegistry
             definition={{ type: 'multiple_choice', id: 'ree-mcq', questions: reeManifest.practice.mcq.questions }}
             response={mcq} onChange={(next) => setMcq(next as McqResponse)}
-            result={mcqAttempt?.result} disabled={!canEdit} />
-          {canEdit && <button type="button" disabled={busy || reeManifest.practice.mcq.questions.some((q) => !mcq[q.id]?.choice || !mcq[q.id]?.stage)}
+            result={mcqAttempt?.result} disabled={!canEditStage} />
+          {canEditStage && <button type="button" disabled={busy || !validReeActivityResponse('ree-mcq', mcq)}
             onClick={() => void submitPractice('ree-mcq', mcq)}
             className="mt-4 rounded-lg bg-master px-4 py-2 text-sm font-medium text-white disabled:opacity-50">Nộp Bài 1 và xem giải thích</button>}
           <h3 className="mt-8 font-semibold text-master">{reeManifest.practice.matching.title}</h3>
@@ -298,28 +311,31 @@ export function ModulePlayer() {
               explains: reeManifest.practice.matching.explains,
               examples: reeManifest.practice.matching.examples }}
             response={matching} onChange={(next) => setMatching(next as MatchingResponse)}
-            result={matchingAttempt?.result} disabled={!canEdit} />
-          {canEdit && <button type="button" disabled={busy || reeManifest.practice.matching.responds.some((item) => !matching[item.id]?.explain || !matching[item.id]?.example)}
+            result={matchingAttempt?.result} disabled={!canEditStage} />
+          {canEditStage && <button type="button" disabled={busy || !validReeActivityResponse('ree-matching', matching)}
             onClick={() => void submitPractice('ree-matching', matching)}
             className="mt-4 rounded-lg bg-master px-4 py-2 text-sm font-medium text-white disabled:opacity-50">Nộp Bài 2 và xem giải thích</button>}
           {matchingAttempt && <p className="mt-4 text-sm text-slate-600">{reeManifest.practice.matching.conclusion}</p>}
-          {canEdit && <NextButton disabled={busy || !mcqAttempt || !matchingAttempt}
+          {canEditStage && <NextButton disabled={busy || !mcqAttempt || !matchingAttempt}
             onClick={() => void progress('Practice', { mcq, matching })}>Tiếp tục đến Apply</NextButton>}
           {activities.length > 0 && <p className="mt-3 text-xs text-slate-500">Đã lưu {activities.length} lượt Practice; các lần thử lại được giữ trong lịch sử.</p>}
         </>}
 
         {viewStage === 'Apply' && <>
           <p className="mb-4 text-sm text-slate-700">{reeManifest.apply.introduction}</p>
-          <div className="space-y-4">{reeManifest.apply.prompts.map((prompt) => (
+          <div className="space-y-4">{reeManifest.apply.prompts.map((prompt) => canEditStage ? (
             <AudioPrompt key={prompt.id} attemptId={attempt.id} taskId={task.id} studentId={profile.id}
-              promptId={prompt.id} prompt={prompt.text} recordings={recordings}
+              promptId={prompt.id} prompt={prompt.text} recordings={recordings.filter((item) => item.attempt_id === attempt.id)}
               onSaved={() => refreshEvidence(attempt)} />
+          ) : (
+            <div key={prompt.id}><p className="mb-1 text-sm font-medium">{prompt.text}</p>
+              {latestRecording(recordings,prompt.id) && <SavedRecording recording={latestRecording(recordings,prompt.id)!} />}</div>
           ))}</div>
           <div className="mt-4 rounded-xl bg-slate-50 p-4 text-sm">
             <p className="font-semibold text-master">Nhắc nhanh trước khi ghi âm (lấy từ phần Learn):</p>
             {reeManifest.apply.reminder.map((item) => <p key={item} className="mt-2">{item}</p>)}
           </div>
-          {canEdit && <NextButton disabled={busy || reeManifest.apply.prompts.some((p) => !latestRecording(recordings,p.id))}
+          {canEditStage && <NextButton disabled={busy || reeManifest.apply.prompts.some((p) => !latestRecording(recordings,p.id))}
             onClick={() => void progress('Apply')}>Tiếp tục đến Reflect</NextButton>}
         </>}
 
@@ -331,16 +347,16 @@ export function ModulePlayer() {
           })}</div>
           <div className="mt-5 space-y-3">{reeManifest.reflect.items.map((item,index) => (
             <label key={item} className="flex gap-3 rounded-xl border border-slate-200 p-3 text-sm">
-              <input type="checkbox" checked={checklist[index]} disabled={!canEdit}
+              <input type="checkbox" checked={checklist[index]} disabled={!canEditStage}
                 onChange={(event) => {
                   const next = [...checklist]; next[index] = event.target.checked; setChecklist(next);
-                  void saveModuleProgress(attempt.id,'Reflect',{ checklist: next },false)
+                  void saveModuleProgress(attempt.id,'Reflect',{ checklist: next, reviewed: false },false)
                     .catch(() => setError('Chưa lưu được checklist. Thử lại khi có mạng.'));
                 }} />
               <span>{item}</span>
             </label>
           ))}</div>
-          {canEdit && <NextButton disabled={busy} onClick={() => void progress('Reflect', { checklist })}>Tiếp tục đến Verify</NextButton>}
+          {canEditStage && <NextButton disabled={busy} onClick={() => void progress('Reflect', { checklist, reviewed: true })}>Tiếp tục đến Verify</NextButton>}
         </>}
 
         {viewStage === 'Verify' && <>
@@ -348,16 +364,17 @@ export function ModulePlayer() {
           {reeManifest.verify.guidance.map((line) => <p key={line} className="mb-2 text-sm text-slate-600">{line}</p>)}
           {latestRecording(recordings,'discover') && <div className="my-4">
             <p className="mb-2 text-sm font-semibold text-master">Bản Discover để so sánh</p>
+            {latestRecording(recordings,'discover')?.attempt_id !== attempt.id && <p className="mb-2 text-xs text-slate-500">Bằng chứng giữ từ lượt học trước</p>}
             <SavedRecording recording={latestRecording(recordings,'discover')!} />
           </div>}
-          {canEdit && <AudioPrompt attemptId={attempt.id} taskId={task.id} studentId={profile.id}
-            promptId="verify" prompt={reeManifest.verify.prompt} recordings={recordings}
+          {canEditStage && <AudioPrompt attemptId={attempt.id} taskId={task.id} studentId={profile.id}
+            promptId="verify" prompt={reeManifest.verify.prompt} recordings={recordings.filter((item) => item.attempt_id === attempt.id)}
             onSaved={() => refreshEvidence(attempt)} />}
           <div className="mt-5 rounded-xl bg-slate-50 p-4 text-sm">
             <p className="font-semibold text-master">Điều kiện đạt</p>
             <p className="mt-1">Từ 6/8 điểm trở lên, không tiêu chí nào bằng 0, và bản ghi Verify dài 20–30 giây. Coach quyết định cuối cùng.</p>
           </div>
-          {canEdit && <NextButton disabled={busy || !latestCurrentRecording(recordings,'verify',attempt.id)} onClick={() => void submitVerify()}>Nộp Verify cho coach</NextButton>}
+          {canEditStage && <NextButton disabled={busy || !latestCurrentRecording(recordings,'verify',attempt.id)} onClick={() => void submitVerify()}>Nộp Verify cho coach</NextButton>}
           {submission?.feedback_text && <div className="mt-4 rounded-xl bg-emerald-50 p-4 text-sm">
             <p className="font-semibold text-master">Phản hồi của coach</p>
             <p className="mt-2 whitespace-pre-wrap">{submission.feedback_text}</p>

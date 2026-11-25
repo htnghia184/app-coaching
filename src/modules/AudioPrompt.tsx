@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createSignedFileUrl, uploadCoachingFile } from '../lib/coachingService';
 import { saveModuleRecording, type ModuleRecording } from './moduleService';
+import { persistRecording } from './recordingSave';
 
 export function SavedRecording({ recording }: { recording: ModuleRecording }) {
   const [url, setUrl] = useState('');
@@ -125,9 +126,10 @@ export function AudioPrompt({
     setSaving(true);
     setError('');
     try {
-      const path = pendingPath ?? await uploadCoachingFile(studentId, taskId, file, fileName);
-      setPendingPath(path); // Retain path if metadata save fails; retry without uploading again.
-      await saveModuleRecording(attemptId, promptId, path, duration);
+      await persistRecording(pendingPath,
+        () => uploadCoachingFile(studentId, taskId, file, fileName, attemptId),
+        async (path) => { await saveModuleRecording(attemptId, promptId, path, duration); },
+        setPendingPath);
       setFile(null);
       setPendingPath(null);
       setPreview('');
