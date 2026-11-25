@@ -79,3 +79,11 @@ Counts from E-Master Supabase project `ypsggndvjzquionaapjs`, without fetching l
 **Interpretation:** Data exists for the coaching assignment/submission/review loop, including persisted revision history. This is not proof of fully working UI, authenticated E2E, or paid-learner validation. The module table is empty, so no DB-backed micro-modules have been loaded/published as of this audit; external production assets were not inspected. Session records are absent, not necessarily evidence that no coaching conversations occurred.
 
 **Security findings above remain recorded as deferred by product owner on 2026-11-25; no production security changes authorized or performed.** Preserve their priority/risk classification when planning future remediation.
+
+## IELTS engine implementation — feature branch, 2026-11-25
+
+Base `main` SHA `e7f3bd460d0f7880fb56543580d5c6bb69f96bea`; implementation commit `ee5199d` on `codex/ielts-module-engine`. Issue #2 clarifications and the Simple Answer Development Word source were read. Source-present: six-stage player/progress UI, REE public manifest, MCQ/matching interactions, separate audio recordings, reflection checklist, coach rubric UI, secure service boundary and proposed SQL for durable attempts, private keys, RLS and review integration. Module is seeded unpublished in the **proposal only**.
+
+Tests at implementation commit: `npm run typecheck` PASS; `npm run test:modules` PASS (2 tests); `npm run build` PASS (Vite chunk-size warning). `git diff --cached --check` PASS before commit. No authenticated browser E2E, SQL migration execution, Supabase role/RLS test, mobile recording QA, screenshot, preview deployment or production deployment was performed. This is **not** a claim of live functional acceptance.
+
+Release blockers: two Learn audio samples are unlocated; private source answer/solution data cannot be committed to this public repository and is not imported; m02/m03/m04 video mappings remain unverified; Word-to-screen content needs human QA; P0 `profiles.role`/signup metadata risk remains unresolved. The migration file requires schema/security review and approved isolated test execution before any production decision.
