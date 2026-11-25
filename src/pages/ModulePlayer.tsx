@@ -256,6 +256,13 @@ export function ModulePlayer() {
         </>}
 
         {viewStage === 'Learn' && <>
+          {reeManifest.assets.filter((asset) => asset.stage === 'Learn' && asset.kind === 'video').map((asset) => (
+            <div key={asset.id} className="mb-5 rounded-xl border border-emblue/20 bg-emblue/5 p-4">
+              <p className="font-semibold text-master">Video bài học: {asset.id}</p>
+              <a href={asset.url} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-sm font-medium text-emblue underline">Mở video Learn trên SharePoint</a>
+              <p className="mt-2 text-xs text-slate-600">Video lưu trên SharePoint; có thể cần đăng nhập tài khoản được cấp quyền. Phát trực tiếp trong ứng dụng chưa được xác minh.</p>
+            </div>
+          ))}
           <div className="space-y-3 text-sm text-slate-700">{reeManifest.learn.introduction.map((item) => <p key={item}>{item}</p>)}</div>
           <div className="mt-5 grid gap-3 sm:grid-cols-3">{reeManifest.learn.layers.map((layer, index) => (
             <div key={layer.label} className="rounded-xl border border-emblue/20 bg-emblue/5 p-4">
