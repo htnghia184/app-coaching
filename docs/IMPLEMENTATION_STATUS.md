@@ -36,3 +36,12 @@
 
 ## Update protocol
 Every status change must include date, SHA, environment, exact test/evidence, actor and unresolved risk. Source-present is not test-passed; test-passed is not deployed; deployed is not production-verified.
+
+## Connected-service verification — 2026-11-25 (read-only)
+
+- **Vercel:** project `app-coaching` exists (Vite, Node 24). Production deployment `dpl_DNKXKXQuEyuc6Stm4xUZgayZ47MG` is `READY`, `target=production`, branch `main`, commit `4def068297c2fcb73ed99c10c50432dbdff8ec0c`. Project lists `learn.e-master.vn` and `www.learn.e-master.vn` as attached domains. `READY` confirms deployment state, not authenticated feature behavior.
+- **Draft PR preview:** deployment `dpl_EQx1ZHiv3jnmLrokcvp9d8PiESqD` is `READY` on `docs/ai-context-audit-20261125`, commit `5a066ac7f03d7ee65b29090053098710e4c25599`, `target=null` (preview). Build logs show `npm run build` and successful build/deployment, with npm install-script and chunk-size warnings. This is **not** a production deployment.
+- **Supabase connector scope:** only project `app-thu-mua` was returned by connected project listing; the shared E-Master assessment/coaching Supabase project was **not available through this connection**. No schema, RLS, RPC, storage or migration inspection was performed on the E-Master database. Do **not** infer coaching DB status from the shrimp app project.
+- **Not performed:** login, learner/coach role E2E, RLS penetration checks, mobile UX, authenticated production data inspection, or live HTTP domain verification.
+
+**Next dependency:** connect/grant access to the actual E-Master shared Supabase project (the one backing `test.e-master.vn`) before conducting the planned read-only DB/RLS audit. Keep this PR draft until reviewed.
