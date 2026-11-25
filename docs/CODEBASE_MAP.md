@@ -1,6 +1,6 @@
 # Codebase map — app-coaching
 
-**Evidence:** GitHub files read on 2026-11-25, repository `htnghia184/app-coaching`, latest commit returned by connector `4def068297c2fcb73ed99c10c50432dbdff8ec0c`. This is a **targeted source map**, not an exhaustive recursive inventory. Recheck HEAD and paths before modifying code.
+**Evidence:** GitHub files read on 2026-11-25, repository `htnghia184/app-coaching`, latest commit returned by connector `4def068297c2fcb73ed99c10c50432dbdff8ec0c`. The GitHub recursive tree was enumerated completely (59 entries, `truncated=false`); source behavior review remains targeted. Recheck HEAD and paths before modifying code.
 
 | Concern | Primary files | Notes |
 | --- | --- | --- |
@@ -26,7 +26,7 @@
 - **Login and roles:** `LoginPage.tsx` → `AuthProvider.tsx` / `RequireRole.tsx` → session/profile; backend RLS remains authoritative.
 
 ## Documentation boundary
-Local project documentation supplied by product owner (master context, decision log, backlog, pilot, Trae task, dated audits) is **not automatically synced to GitHub**. Historical references to `00_READ_ME_FIRST.md`, `ARCHITECTURE_V1.md`, `DATABASE_V1.md`, and `VERTICAL_SLICE_01.md` were not found at repository root on `main` during this check. Search their actual locations or request source files before relying on them. Do not recreate old specs from memory.
+Local project documentation supplied by product owner (master context, decision log, backlog, pilot, Trae task, dated audits) is **not automatically synced to GitHub**. The existing technical source documents are present under `docs/`: `00_READ_ME_FIRST.md`, `ARCHITECTURE_V1.md`, `DATABASE_V1.md`, `VERTICAL_SLICE_01.md`, and `PRODUCT_SPEC_V1.md — E-Master Personal Coaching.md`. Follow `docs/00_READ_ME_FIRST.md` for precedence and task-based reading. The root-path 404s in the initial inspection were path errors, not missing documentation.
 
 ## Known audit limits
-No full Git tree enumeration, local install/build, browser E2E, production database inspection, or Vercel verification was performed for this map. Large-file size is a maintenance signal, **not** proof of a bug or mandate to refactor.
+Full Git tree enumeration completed (59 entries). No local install/build, browser E2E, production database inspection, or Vercel verification was performed for this map. Large-file size is a maintenance signal, **not** proof of a bug or mandate to refactor.
