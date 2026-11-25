@@ -93,3 +93,9 @@ The product owner explicitly identifies `ielts-s-p1-m02 with audio.mp4` as the L
 - Do not build paid video streaming, signed playback URLs, or DRM for the pilot. Reconsider only if commercial scale, abuse or content sensitivity justifies it.
 - Current REE video source is SharePoint `ielts-s-p1-m02 with audio.mp4` (owner-confirmed); its **YouTube ID is still pending**. Existing SharePoint link is an interim source reference, not proof of YouTube integration or verified student playback.
 - This is an **architecture decision**, not a claim that YouTube upload, Admin media editor, or YouTube embed player have already shipped. Keep the feature PR in Draft until separately approved and tested.
+
+## Implementation update: Admin JSON Draft preflight (2026-11-25)
+
+**Implemented on draft branch, not deployed:** `src/modules/moduleImport.ts` parses public JSON, rejects known private-answer keys, enforces the current REE manifest shape and fixed six-stage order, and invokes the existing manifest validator. `src/pages/AdminModules.tsx` now has a JSON textarea, "Nạp REE mẫu", validation and a six-stage metadata preview. This is **client-side preflight only**; it neither saves to Supabase nor changes publication state. It is not the full student renderer preview.
+
+**Remaining critical work:** define versioned generic schema beyond the REE-specific manifest; authenticated admin server-side import into Draft with RLS/authorization; isolated database migrations; secure private-answer-key ingestion; immutable versioning; server-side Publish gate; render imported data in the actual student player; browser/mobile E2E. Do not merge or deploy this draft before review/testing. No production database operations have been performed.
