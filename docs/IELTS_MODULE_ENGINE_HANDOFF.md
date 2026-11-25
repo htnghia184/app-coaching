@@ -44,3 +44,21 @@ Do this only on an approved test environment first. Verify a student can retriev
 - Test student/coach/admin/anonymous access, answer leakage before/after submission, stage resume, retries and source-version history. Test multiple recordings, micro permissions, browser MIME variants, interrupted uploads and signed URL playback on mobile. Verify the first Verify submission and revision-request/resubmission path.
 - Run regression against existing text/audio/file/checkoff coaching tasks and offline PWA shell. Existing E2E scripts can write data and must only run with approved disposable accounts and environment.
 - Capture screenshots from an authenticated test session after backend and content dependencies are available. A build alone is not evidence of an end-to-end coaching workflow.
+
+## Planned module authoring and import workflow (product decision, 2026-11-25)
+
+**Status: PLANNED, NOT IMPLEMENTED.** Admin currently supports read-only module inventory and six-stage REE preview. The REE manifest and player are still hardcoded to a known module/version. Do not describe the following workflow as shipped.
+
+**Chosen MVP: hybrid AI-assisted content preparation + Admin import, not per-module hardcoding and not a full drag-and-drop CMS.**
+
+1. Content owner prepares a standardized Word document or structured JSON using the common six-stage template, with module metadata (title, level, skill, learning outcome, prerequisites, duration), stage content, activities, media references, and source trace.
+2. AI or an authorized conversion workflow transforms source material into a **validated, versioned module JSON draft**. Preserve the source wording and question IDs for human review; never treat AI output as automatically approved.
+3. Admin imports JSON through the authenticated Admin interface. The server validates schema, activity types, version and authorization, then creates a **Draft** in Supabase. Invalid imports produce actionable field-level errors. Do not commit generated module content to frontend code for each new lesson.
+4. Admin previews all six stages **using the same renderer the student will use**, edits Draft metadata/content and associates verified video/media. For the REE example, both sample audios are embedded in the Learn video; no separate audio upload is required.
+5. Private correct answers and explanations are imported **through a separate server-authorized secure path** into the version-pinned private key store. Never include them in public module JSON, client bundle, repository, logs, screenshots, or broadly readable tables.
+6. A trusted **server-side publication gate** verifies required media and source/content approval, private keys and activity completeness, access/security checks, and version integrity. An Admin can Publish only when all checks pass. UI checks alone must not bypass this gate.
+7. Coach assigns only Published modules. Student player dynamically renders the selected version from the database; progress, recordings, attempts, grading and coach review remain pinned to that immutable version. Changes after publication require a **new Draft version**, leaving existing learners' history intact.
+
+**Engineering priorities:** (a) define the reusable data-driven manifest/schema and dynamic player boundary; (b) implement Admin JSON import, Draft edit and true student-view preview; (c) implement secure private key import and server-side publish validation; (d) add version cloning and verified media selection. Do not build a complex visual drag-and-drop editor for the initial 12-module pilot. A richer visual editor, question bank and bulk asset management can follow once module volume justifies them.
+
+**Release discipline:** Develop/test against Supabase Local or an explicitly approved isolated environment. Do not apply production migrations, publish incomplete modules, merge this draft PR, or deploy without separate approval. Browser/mobile E2E remains required.
