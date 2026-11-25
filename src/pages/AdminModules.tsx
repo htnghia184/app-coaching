@@ -63,6 +63,7 @@ export function AdminModules() {
         <p className="font-semibold text-master">{importPreview.title} · v{importPreview.version} · {importPreview.level}</p>
         <p className="text-sm">{importPreview.outcome}</p>
         <ol className="list-decimal pl-5 text-sm">{STAGES.map(stage => <li key={stage}>{stage} · {importPreview.stageMinutes[stage]} phút</li>)}</ol>
+        {importPreview.id === REE_MODULE_ID && importPreview.version === reeManifest.version && importPreview.key === reeManifest.key && <Link to="/admin/modules/demo" className="inline-block rounded-lg bg-emblue px-4 py-3 text-sm font-semibold text-white">Xem thử như học viên (không lưu dữ liệu)</Link>}
         <p className="text-xs text-amber-800">Preview hợp lệ ở client. Chưa lưu Draft, chưa nhập khóa đáp án, chưa Publish. Cần backend kiểm tra schema và phân quyền trước khi bật lưu.</p>
       </div>}
     </section>
