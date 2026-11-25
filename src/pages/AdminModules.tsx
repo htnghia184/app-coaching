@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { parseModuleDraft } from '../modules/moduleImport';
+import type { ModuleManifest } from '../modules/ree';
 import { Link } from 'react-router-dom';
 import { listIeltsModulesForAdmin, type LearningModuleSummary } from '../lib/coachingService';
 import { REE_MODULE_ID, reeManifest, STAGES, validateModuleManifest } from '../modules/ree';
@@ -23,6 +25,9 @@ export function AdminModules() {
   const [selectedId, setSelectedId] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [draftJson, setDraftJson] = useState('');
+  const [importPreview, setImportPreview] = useState<ModuleManifest | null>(null);
+  const [importError, setImportError] = useState('');
 
   useEffect(() => {
     void listIeltsModulesForAdmin().then((rows) => {
@@ -45,6 +50,22 @@ export function AdminModules() {
       <h1 className="mt-2 text-xl font-semibold text-master sm:text-2xl">IELTS micro-module</h1>
       <p className="mt-1 text-sm text-slate-600">Danh mục và bản xem trước theo phiên bản. Nội dung đã Published được giữ nguyên.</p>
     </header>
+    <section className="rounded-xl border border-slate-200 bg-white p-5 space-y-3" aria-label="Import JSON Draft">
+      <h2 className="font-semibold text-master">Import JSON · Draft Preview (chưa lưu database)</h2>
+      <p className="text-sm text-slate-600">Dán manifest JSON công khai để kiểm tra cấu trúc và xem trước sáu giai đoạn. Không dán đáp án/khóa chấm. Đây là kiểm tra ở trình duyệt, không phải Publish Gate.</p>
+      <textarea aria-label="Module JSON" value={draftJson} onChange={(e) => { setDraftJson(e.target.value); setImportPreview(null); setImportError(''); }} rows={6} className="w-full rounded-lg border border-slate-300 p-3 font-mono text-xs" placeholder='{ "id": "...", "stages": ["Discover", "Learn", "Practice", "Apply", "Reflect", "Verify"], ... }' />
+      <div className="flex flex-wrap gap-2">
+        <button type="button" onClick={() => { try { setImportPreview(parseModuleDraft(draftJson)); setImportError(''); } catch (err) { setImportPreview(null); setImportError(err instanceof Error ? err.message : 'Không đọc được JSON.'); } }} className="rounded-lg bg-master px-4 py-2 text-sm font-semibold text-white">Kiểm tra & xem trước</button>
+        <button type="button" onClick={() => { setDraftJson(JSON.stringify(reeManifest, null, 2)); setImportPreview(null); setImportError(''); }} className="rounded-lg border border-slate-300 px-4 py-2 text-sm">Nạp REE mẫu</button>
+      </div>
+      {importError && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{importError}</p>}
+      {importPreview && <div className="rounded-lg border border-emblue/30 bg-emblue/5 p-4 space-y-2">
+        <p className="font-semibold text-master">{importPreview.title} · v{importPreview.version} · {importPreview.level}</p>
+        <p className="text-sm">{importPreview.outcome}</p>
+        <ol className="list-decimal pl-5 text-sm">{STAGES.map(stage => <li key={stage}>{stage} · {importPreview.stageMinutes[stage]} phút</li>)}</ol>
+        <p className="text-xs text-amber-800">Preview hợp lệ ở client. Chưa lưu Draft, chưa nhập khóa đáp án, chưa Publish. Cần backend kiểm tra schema và phân quyền trước khi bật lưu.</p>
+      </div>}
+    </section>
     {error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
     {loading ? <p>Đang tải module…</p> : modules.length === 0 ?
       <p className="rounded-xl bg-white p-4 text-sm text-slate-600">Chưa có IELTS module trong database.</p> :
