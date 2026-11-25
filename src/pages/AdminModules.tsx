@@ -12,7 +12,7 @@ function publicationGates(module: LearningModuleSummary): string[] {
     return reasons;
   }
   reasons.push(...validateModuleManifest(reeManifest));
-  if (reeManifest.missingAssets.length > 0) reasons.push(`Thiếu ${reeManifest.missingAssets.length} audio Learn từ nguồn.`);
+  if (reeManifest.missingAssets.length > 0) reasons.push('Chưa gắn/xác minh video Learn hoàn chỉnh có cả hai audio mẫu (music và literature).');
   reasons.push('Chưa xác nhận bản đối chiếu nội dung với Word gốc và khóa đáp án riêng cho phiên bản này.');
   reasons.push('Cần xác nhận RLS, quyền media và kiểm thử vai trò trên môi trường phát hành.');
   return reasons;
