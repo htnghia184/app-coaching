@@ -285,8 +285,8 @@ export function ModulePlayer() {
             </div>
           ))}</div>
           <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4">
-            <h3 className="font-semibold text-amber-950">Audio mẫu chưa được cung cấp</h3>
-            <p className="mt-1 text-sm text-amber-900">Nguồn yêu cầu nghe hai bản “Sau” (~22–27 giây) cùng transcript. Transcript ở trên đã có; file audio cần được xác minh trước khi publish.</p>
+            <h3 className="font-semibold text-amber-950">Video Learn chưa được gắn và xác minh</h3>
+            <p className="mt-1 text-sm text-amber-900">Hai audio mẫu (music và literature) nằm bên trong video Learn, không cần upload riêng. Cần gắn video hoàn chỉnh và xác nhận video có đủ hai ví dụ trước khi Publish.</p>
           </div>
           <p className="mt-5 font-medium text-master">{reeManifest.learn.conclusion}</p>
           {canEditStage && <NextButton disabled={busy} onClick={() => void progress('Learn', { acknowledged: true })}>Tiếp tục đến Practice</NextButton>}
