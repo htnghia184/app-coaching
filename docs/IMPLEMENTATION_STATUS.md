@@ -59,3 +59,23 @@ Every status change must include date, SHA, environment, exact test/evidence, ac
 - No authenticated E2E, malicious-user simulation, or production changes. Before fixing, review affected code/DB dependencies and test in a safe environment; apply migration with rollback plan and verify using student/admin/anonymous role scenarios.
 
 **Priority:** Protect `profiles.role` and remove role assignment from user-editable signup metadata before onboarding more learners. Do not merge a docs PR as a substitute for implementing these security fixes.
+
+## Live product-data inventory — 2026-11-25 (read-only)
+
+Counts from E-Master Supabase project `ypsggndvjzquionaapjs`, without fetching learner identities or submission contents:
+
+| Entity | Count | State detail |
+|---|---:|---|
+| learning_modules | 0 | published 0 |
+| coaching_enrollments | 3 | active 3 |
+| coaching_roadmaps | 2 | active 2 |
+| coaching_roadmap_items | 4 | — |
+| coaching_weekly_plans | 10 | active 10 |
+| coaching_tasks | 20 | — |
+| coaching_submissions | 13 | reviewed 10, revision_requested 1, submitted 2 |
+| coaching_submission_revisions | 15 | reviewed 10, revision_requested 2, pending 3 |
+| coaching_sessions | 0 | — |
+
+**Interpretation:** Data exists for the coaching assignment/submission/review loop, including persisted revision history. This is not proof of fully working UI, authenticated E2E, or paid-learner validation. The module table is empty, so no DB-backed micro-modules have been loaded/published as of this audit; external production assets were not inspected. Session records are absent, not necessarily evidence that no coaching conversations occurred.
+
+**Security findings above remain recorded as deferred by product owner on 2026-11-25; no production security changes authorized or performed.** Preserve their priority/risk classification when planning future remediation.
