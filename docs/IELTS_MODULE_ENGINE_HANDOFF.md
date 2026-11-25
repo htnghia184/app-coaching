@@ -9,7 +9,7 @@ Source: [Student Learning Package Simple Answer Development (Part 1)](https://si
 | Source section | Learning experience | Source trace |
 | --- | --- | --- |
 | Discover (~1') | One diagnostic recording, playback and question to revisit in Verify | `discoverPrompt`, prompt ID `discover` |
-| Learn (~6') | Layered REE diagram, response patterns, two before/after examples and transcripts. Missing source audio is called out in the screen. No guessed video. | `learn`, `missingAssets` |
+| Learn (~6') | Layered REE diagram, response patterns, two before/after examples and transcripts. Both example audio tracks are embedded in the Learn lesson video per product-owner clarification (2026-11-25). The video is not yet mapped or verified; no standalone audio uploads are required. | `learn`, `missingAssets` |
 | Practice (~6') | All six MCQs with option **and** Explain/Example choice, then a four-set matching exercise. Each whole exercise must be submitted before server-returned keys/explanations appear. Retries append rows. | `practice.mcq`, `practice.matching`; private activity IDs `ree-mcq`, `ree-matching` |
 | Apply (~4') | Three separate Speaking prompts, each recorded, played back and saved independently. | `apply.prompts` |
 | Reflect (~2') | Playback of Apply recordings and five saved checkboxes. The final item remains self-perception only. | `reflect.items` |
@@ -35,7 +35,7 @@ The GitHub repository is **public**. Answer keys and source explanations must no
 - `answer` JSON for MCQ keys `1`–`6`, each containing `choice` and `stage`; matching keys `1`–`4`, each containing `explain` and `example`.
 - `explanations` JSON mapping those same item IDs to the full original explanation text.
 
-Do this only on an approved test environment first. Verify a student can retrieve feedback after submission, cannot query the private table or fetch keys before submission, and cannot read another learner's attempt. The proposed publish trigger rejects publication while either private key set is absent. Publication also requires both missing Learn audio examples, content review and the P0 role security issue to be addressed or explicitly risk accepted by the owner. Three MP4s `m02/m03/m04` remain unmapped and are not attached to REE.
+Do this only on an approved test environment first. Verify a student can retrieve feedback after submission, cannot query the private table or fetch keys before submission, and cannot read another learner's attempt. The proposed publish trigger rejects publication while either private key set is absent. Publication requires a verified Learn video containing both example audios (music and literature), content review, and applicable security/role checks. Do not require separate Learn audio files. The production profiles.role hotfix was completed separately; verify release-environment role tests before publication. Three MP4s `m02/m03/m04` remain unmapped and are not attached to REE.
 
 ## QA still required
 
