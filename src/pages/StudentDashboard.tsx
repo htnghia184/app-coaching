@@ -291,7 +291,7 @@ export function StudentDashboard() {
                   return (
                     <li key={task.id}>
                       <Link
-                        to={`/student/tasks/${task.id}`}
+                        to={task.module_id ? `/student/modules/${task.id}` : `/student/tasks/${task.id}`}
                         className="group flex items-center justify-between gap-3 py-3"
                       >
                         <div className="min-w-0">
@@ -473,7 +473,7 @@ function PrimaryActionCard({
             <Clock className="h-4 w-4" /> Đang chờ coach chấm bài — bạn không cần làm lại lúc này.
           </span>
           <Link
-            to={`/student/tasks/${task.id}`}
+            to={task.module_id ? `/student/modules/${task.id}` : `/student/tasks/${task.id}`}
             className="inline-flex items-center gap-1.5 text-sm font-semibold text-white underline decoration-white/40 underline-offset-4 hover:decoration-white"
           >
             Xem bài đã nộp
@@ -481,7 +481,7 @@ function PrimaryActionCard({
         </div>
       ) : (
         <Link
-          to={`/student/tasks/${task.id}`}
+          to={task.module_id ? `/student/modules/${task.id}` : `/student/tasks/${task.id}`}
           className="mt-4 inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-master transition hover:bg-white/90"
         >
           {cta.icon}

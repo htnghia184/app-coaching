@@ -7,9 +7,11 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "typecheck": "tsc --noEmit",
+    "test:modules": "node --test tests/module-engine.test.mjs",
     "preview": "vite preview",
     "provision:test-users": "node --env-file=scripts/.env.test scripts/provision-test-users.mjs",
-    "cleanup:test-users": "node --env-file=scripts/.env.test scripts/cleanup-test-users.mjs"
+    "cleanup:test-users": "node --env-file=scripts/.env.test scripts/cleanup-test-users.mjs",
+    "test:import-security": "node --test tests/module-import-security.test.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
@@ -24,6 +26,7 @@
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.21",
     "postcss": "^8.5.3",
+    "supabase": "3.4.0",
     "tailwindcss": "^3.4.17",
     "typescript": "~5.7.2",
     "vite": "^6.0.11",
