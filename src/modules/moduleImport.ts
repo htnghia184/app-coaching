@@ -20,8 +20,8 @@ export function parseModuleDraft(raw: string): ModuleManifest {
   scan(value, 'module');
   const requiredStrings = ['id', 'key', 'title', 'level', 'skill', 'outcome', 'discoverPrompt'];
   for (const key of requiredStrings) if (typeof v[key] !== 'string' || !(v[key] as string).trim()) throw new Error(`Thiếu trường: ${key}`);
-  if (!Number.isInteger(v.version) || Number(v.version) < 1) throw new Error('version phải là số nguyên dương.');
-  if (!Number.isFinite(v.minutes) || Number(v.minutes) <= 0) throw new Error('minutes phải lớn hơn 0.');
+  if ((typeof v.version !== 'number' || !Number.isInteger(v.version)) || Number(v.version) < 1) throw new Error('version phải là số nguyên dương.');
+  if ((typeof v.minutes !== 'number' || !Number.isFinite(v.minutes)) || Number(v.minutes) <= 0) throw new Error('minutes phải lớn hơn 0.');
   if (!Array.isArray(v.stages) || v.stages.join('|') !== STAGES.join('|')) throw new Error('Cần đủ sáu stages theo đúng thứ tự.');
   for (const key of ['source', 'stageMinutes', 'learn', 'practice', 'apply', 'reflect', 'verify', 'mastery']) {
     if (!v[key] || typeof v[key] !== 'object') throw new Error(`Thiếu cấu trúc: ${key}`);
