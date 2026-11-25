@@ -8,6 +8,7 @@ import { CoachDashboard } from './pages/CoachDashboard';
 import { CoachWorkspace } from './pages/CoachWorkspace';
 import { StudentDashboard } from './pages/StudentDashboard';
 import { StudentTaskDetail } from './pages/StudentTaskDetail';
+import { ModulePlayer } from './pages/ModulePlayer';
 
 export default function App() {
   return (
@@ -20,6 +21,7 @@ export default function App() {
         <Route element={<RequireRole role="student"><AppLayout /></RequireRole>}>
           <Route path="/student" element={<StudentDashboard />} />
           <Route path="/student/tasks/:taskId" element={<StudentTaskDetail />} />
+          <Route path="/student/modules/:taskId" element={<ModulePlayer />} />
         </Route>
 
         <Route element={<RequireRole role="teacher"><AppLayout /></RequireRole>}>

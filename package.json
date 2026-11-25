@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "typecheck": "tsc --noEmit",
+    "test:modules": "node --test tests/module-engine.test.mjs",
     "preview": "vite preview",
     "provision:test-users": "node --env-file=scripts/.env.test scripts/provision-test-users.mjs",
     "cleanup:test-users": "node --env-file=scripts/.env.test scripts/cleanup-test-users.mjs"

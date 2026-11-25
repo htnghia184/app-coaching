@@ -225,6 +225,7 @@ export async function createWeeklyPlan(
 export interface CreateTaskInput {
   weekly_plan_id: string;
   task_type: TaskType;
+  module_id?: string | null;
   title: string;
   instructions: string;
   sequence: number;
@@ -238,6 +239,7 @@ export async function createTask(input: CreateTaskInput): Promise<CoachingTask> 
     .insert({
       weekly_plan_id: input.weekly_plan_id,
       task_type: input.task_type,
+      module_id: input.module_id ?? null,
       title: input.title,
       instructions: input.instructions,
       sequence: input.sequence,
@@ -248,6 +250,17 @@ export async function createTask(input: CreateTaskInput): Promise<CoachingTask> 
     .single();
   if (error) fail(error);
   return data as CoachingTask;
+}
+
+/** Published module metadata only; source answers never live in this table. */
+export async function listPublishedModules(): Promise<{ id: string; title: string }[]> {
+  const { data, error } = await supabase
+    .from('learning_modules')
+    .select('id,title')
+    .eq('is_published', true)
+    .order('title');
+  if (error) fail(error);
+  return (data ?? []) as { id: string; title: string }[];
 }
 
 /* ------------------------------------------------------------------ */
