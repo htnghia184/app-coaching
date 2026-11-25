@@ -24,6 +24,10 @@ test('draft endpoint cannot publish or write to student module table', () => {
 
 test('draft SQL is admin-only and immutable via Data API', () => {
   assert.match(sql, /enable row level security/);
+  assert.match(sql, /revoke all on public\.ielts_module_drafts from public, anon, authenticated/);
+  assert.match(sql, /grant select, insert on public\.ielts_module_drafts to authenticated/);
+  assert.match(sql, /ielts_draft_shape_valid\(manifest\)/);
+  assert.match(sql, /ielts_draft_manifest_safe\(item\.value, depth \+ 1\)/);
   assert.match(sql, /for select to authenticated/);
   assert.match(sql, /for insert to authenticated/);
   assert.match(sql, /created_by = \(select auth\.uid\(\)\)/);

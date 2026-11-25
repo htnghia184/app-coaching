@@ -19,8 +19,11 @@ test('REE manifest matches source structure and has no leaked keys', () => {
   assert.deepEqual(reeManifest.mastery, {
     minimumScore: 6, noZero: true, minSeconds: 20, maxSeconds: 30,
   });
-  assert.equal(reeManifest.assets.length, 0);
-  assert.equal(reeManifest.missingAssets.length, 2);
+  assert.equal(reeManifest.assets.length, 1);
+  assert.equal(reeManifest.assets[0].id, 'ielts-s-p1-m02');
+  assert.equal(reeManifest.assets[0].stage, 'Learn');
+  assert.equal(reeManifest.assets[0].verified, false);
+  assert.equal(reeManifest.missingAssets.length, 0);
   const publicPayload = JSON.stringify(reeManifest);
   assert.doesNotMatch(publicPayload, /"correct"\s*:|"explanation"\s*:|"answerKey"\s*:/);
 });
