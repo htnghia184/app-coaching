@@ -18,8 +18,11 @@ test('demo has six-stage navigation, practice, reflect and isolated audio', () =
   for (const stage of ['Discover', 'Learn', 'Practice', 'Apply', 'Reflect', 'Verify']) {
     assert.ok(demo.includes("stage === '" + stage + "'"), stage);
   }
-  assert.match(demo, /InteractionRegistry/);
-  assert.match(demo, /validReeActivityResponse/);
+  assert.match(demo, /practiceTotal/);
+  assert.match(demo, /chooseMcq/);
+  assert.match(demo, /chooseMatch/);
+  assert.match(demo, /learnTab/);
+  assert.match(demo, /showLearnNotes/);
   assert.match(demo, /MediaRecorder/);
   assert.match(demo, /URL\.revokeObjectURL/);
   assert.match(demo, /getUserMedia/);
