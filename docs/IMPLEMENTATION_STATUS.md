@@ -45,3 +45,17 @@ Every status change must include date, SHA, environment, exact test/evidence, ac
 - **Not performed:** login, learner/coach role E2E, RLS penetration checks, mobile UX, authenticated production data inspection, or live HTTP domain verification.
 
 **Next dependency:** connect/grant access to the actual E-Master shared Supabase project (the one backing `test.e-master.vn`) before conducting the planned read-only DB/RLS audit. Keep this PR draft until reviewed.
+
+## Live Supabase security audit — 2026-11-25 (read-only; urgent)
+
+**Scope:** E-Master organization, project `ypsggndvjzquionaapjs`. No writes or exploit tests performed.
+
+- All 26 `public` tables report RLS enabled; coaching tables and `learning_modules` are present. `list_migrations` returned an empty list; this does **not** establish that migration 018/019/020 SQL was never applied.
+- **CRITICAL potential privilege escalation:** `profiles` has `UPDATE` policy for `auth.uid() = id` without restricting `role`, while `authenticated` has column-level UPDATE privilege on `profiles.role`. `get_user_role()` reads `profiles.role`. Restrict role updates and ensure legitimate admin role management remains available.
+- **CRITICAL potential signup role injection:** `public.handle_new_user()` inserts `COALESCE((new.raw_user_meta_data->>'role')::user_role,'student')` into `profiles.role`. User metadata is not a trusted authorization source. Force a safe default role on signup and move privileged role assignment to a trusted admin-only path.
+- Security Advisor reports 10 `SECURITY DEFINER` functions executable by `anon` and `authenticated`; functions include `admin_create_user`, `admin_delete_user`, `get_user_role`, and coaching RPCs. Inspection found admin and coaching RPCs do have internal role/ownership checks, so public EXECUTE **alone** is not proof of unauthorized operations. Still reduce exposed EXECUTE grants based on intended callers, especially trigger-only functions.
+- `coaching-submissions` Storage bucket exists, `public=false`, 50 MiB file size limit. Storage policies constrain student paths by UID and task enrollment; coach reads by assigned enrollment. `exam-audio` is a separate public bucket with anonymous upload/read, relevant to test portal and worth a separate abuse/privacy review.
+- Leaked-password protection disabled per Supabase Security Advisor.
+- No authenticated E2E, malicious-user simulation, or production changes. Before fixing, review affected code/DB dependencies and test in a safe environment; apply migration with rollback plan and verify using student/admin/anonymous role scenarios.
+
+**Priority:** Protect `profiles.role` and remove role assignment from user-editable signup metadata before onboarding more learners. Do not merge a docs PR as a substitute for implementing these security fixes.
