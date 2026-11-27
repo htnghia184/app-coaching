@@ -53,7 +53,7 @@ import type {
 } from '../lib/types';
 import { RoadmapItemBadge, SubmissionBadge } from '../components/StatusBadge';
 import { Spinner } from '../components/Spinner';
-import { AttachmentLink } from '../components/AttachmentLink';
+import { EvidenceAttachment } from '../components/AttachmentLink';
 import { RevisionHistory } from '../components/RevisionHistory';
 import { CoachModuleReview } from '../modules/CoachModuleReview';
 import { REE_MODULE_ID } from '../modules/ree';
@@ -1161,7 +1161,7 @@ function ReviewPanel({
         ) : null}
         {submission.storage_path ? (
           <div className="mt-2 flex flex-wrap items-center gap-3">
-            <AttachmentLink path={submission.storage_path} />
+            <EvidenceAttachment path={submission.storage_path} audio={submission.duration_seconds !== null} />
             {submission.duration_seconds !== null ? (
               <span className="text-xs text-slate-400">{submission.duration_seconds}s</span>
             ) : null}
