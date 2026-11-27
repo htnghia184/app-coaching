@@ -54,6 +54,7 @@ import type {
 import { RoadmapItemBadge, SubmissionBadge } from '../components/StatusBadge';
 import { Spinner } from '../components/Spinner';
 import { EvidenceAttachment } from '../components/AttachmentLink';
+import { LearnerOutcomeProfile, localOutcomeEnabled } from '../components/LearnerOutcomeProfile';
 import { RevisionHistory } from '../components/RevisionHistory';
 import { CoachModuleReview } from '../modules/CoachModuleReview';
 import { REE_MODULE_ID } from '../modules/ree';
@@ -205,6 +206,8 @@ export function CoachWorkspace() {
         ) : null}
       </section>
 
+      {localOutcomeEnabled && <LearnerOutcomeProfile key={enrollment.id} enrollmentId={enrollment.id} revisions={revisions} tasks={tasks} />}
+
       {/* Lộ trình học tập */}
       <RoadmapPanel
         enrollmentId={enrollment.id}
@@ -214,11 +217,11 @@ export function CoachWorkspace() {
       />
 
       {/* Tạo weekly plan */}
-      <WeeklyPlanComposer
+      <div id="weekly-plan" className="scroll-mt-6"><WeeklyPlanComposer
         enrollmentId={enrollment.id}
         nextWeekNumber={nextWeekNumber}
         onCreated={load}
-      />
+      /></div>
 
       {/* Danh sách plan + task + review */}
       {plans.length === 0 ? (
