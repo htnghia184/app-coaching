@@ -35,6 +35,13 @@ import type {
 } from '../lib/types';
 import { RoadmapItemBadge, StatusBadge } from '../components/StatusBadge';
 import { Spinner } from '../components/Spinner';
+import { REE_MODULE_ID } from '../modules/ree';
+
+function taskHref(task: CoachingTask): string {
+  if (task.module_id && task.module_id !== REE_MODULE_ID && import.meta.env.DEV
+    && /^http:\/\/(127\.0\.0\.1|localhost):54321$/.test(import.meta.env.VITE_SUPABASE_URL ?? '')) return '/local-pilot';
+  return task.module_id ? `/student/modules/${task.id}` : `/student/tasks/${task.id}`;
+}
 
 const TASK_TYPE_LABEL: Record<string, string> = {
   text: 'Trả lời văn bản',
@@ -291,7 +298,7 @@ export function StudentDashboard() {
                   return (
                     <li key={task.id}>
                       <Link
-                        to={task.module_id ? `/student/modules/${task.id}` : `/student/tasks/${task.id}`}
+                        to={taskHref(task)}
                         className="group flex items-center justify-between gap-3 py-3"
                       >
                         <div className="min-w-0">
@@ -473,7 +480,7 @@ function PrimaryActionCard({
             <Clock className="h-4 w-4" /> Đang chờ coach chấm bài — bạn không cần làm lại lúc này.
           </span>
           <Link
-            to={task.module_id ? `/student/modules/${task.id}` : `/student/tasks/${task.id}`}
+            to={taskHref(task)}
             className="inline-flex items-center gap-1.5 text-sm font-semibold text-white underline decoration-white/40 underline-offset-4 hover:decoration-white"
           >
             Xem bài đã nộp
@@ -481,7 +488,7 @@ function PrimaryActionCard({
         </div>
       ) : (
         <Link
-          to={task.module_id ? `/student/modules/${task.id}` : `/student/tasks/${task.id}`}
+          to={taskHref(task)}
           className="mt-4 inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-master transition hover:bg-white/90"
         >
           {cta.icon}

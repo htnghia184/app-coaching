@@ -31,6 +31,6 @@ test('demo has six-stage navigation, practice, reflect and isolated audio', () =
 test('demo has no production backend write dependencies or fake scoring', () => {
   assert.doesNotMatch(demo, /from ['"][^'"]*(coachingService|moduleService|supabase|AudioPrompt)/i);
   assert.doesNotMatch(demo, /\.from\(|\.rpc\(|\.upload\(|fetch\(/);
-  assert.match(demo, /không chấm điểm thật/);
-  assert.match(demo, /KHÔNG LƯU DỮ LIỆU/);
+  assert.match(demo, /Chưa có kết quả chấm điểm hoặc nhận xét của coach/);
+  assert.match(demo, /Không lưu dữ liệu/);
 });

@@ -1,19 +1,25 @@
-# Integrated pilot release gates — 2026-11-27
+# Integrated Coaching Pilot verification — 2026-11-27
 
-This branch merges the two prototype tracks and exposes a synthetic Coach/Student preview at `/prototype/integrated-pilot`. It is not connected to real learners. The existing authenticated enrollment, roadmap, weekly plan, task, submission, review and revision pages remain the production spine; no database change was applied.
+Branch `codex/integrated-coaching-pilot-20261127` remains a draft integration of Coaching Core and the generic module engine. All database writes described here used the verified isolated Supabase Local stack (`supabase_db_codex-coaching`, PostgreSQL 17.12, ports 54321/54322) and disposable synthetic users. Neither SQL proposal was run in production.
 
-## Implemented in this branch
+## Implemented and observed
 
-- The four generic module previews now reference the four pilot Speaking LO IDs. Coach assignment selection includes the module content version; direct-task and live-session paths remain independent. Synthetic student submissions and revisions create separate evidence records. Coach assessments are append-only in the preview, and coach work uses entered minutes.
-- The review-only LO SQL proposal uses submission revisions and live-session notes as evidence sources, rather than REE-specific module attempts. Priorities can be deactivated. It has not been executed.
-- The review-only media resolver requires an exact allowed origin for browser calls and matches an asset to a media activity in the requested module manifest and content version. Private asset configuration is keyed by module ID, version and asset reference. No assets or IDs are bundled in the frontend.
-- Local grant inspection confirms the new LO evidence and assessment RPCs are not executable by `anon`. Existing anonymous grants on `update_own_coaching_submission` and `review_coaching_submission` were left intact; those functions enforce authenticated identity internally.
+- The development-only `/local-pilot` Coach and Student workspace uses authenticated Supabase Local enrollment, weekly plan, tasks, submissions, revisions, LO evidence and assessment RPCs, generic module assignment and progress RPCs, private Storage, and the media resolver. It refuses non-local backends. Existing production-facing flows remain in place.
+- The review-only `docs/proposed/generic_module_persistence_review_only.sql` pins assignments and evidence to immutable generic module IDs and content versions; persists attempts, stage progress, responses, recordings, Verify submissions and coach reviews; and applies ownership validation, RLS and least-privilege RPCs. It stays separate from REE-specific attempts and from LO mastery assessment.
+- The four Speaking module previews use structural synthetic fixtures. M01 Verify requires a fresh recording and rubric sum at least 6/8 with no zero criterion; M02 requires five of six accepted items with no repeated question. Stage completion and module Verify remain separate from LO assessment. Direct task and live-session evidence remain independent of modules.
+- The media resolver was exercised with authenticated assigned student, assigned coach and admin access. Unrelated student and coach, anonymous caller, wrong version, wrong asset and wrong browser origin were denied. Existing assessment application anonymous reads/grants were preserved, while coaching RPCs denied anonymous use.
+- An authenticated browser session on `http://127.0.0.1:5174/local-pilot` demonstrated assignment, learning, private synthetic WebM upload, evidence submission, coach review, revision, reassessment and next-task prescription. A later strict Verify browser submission persisted an `awaiting_review` attempt with five prerequisite stages and one private recording. Browser observations were checked against Supabase Local rows; HTTP 200 alone was not treated as proof.
 
-## Release blockers
+## Exact checks
 
-1. **Isolated database and authenticated E2E.** Docker access was restored. The review-only SQL applied successfully to Supabase Local (`supabase_db_codex-coaching`, Postgres 17.12, ports 54321/54322). `tests/coaching-core-local.test.mjs` passed with disposable authenticated users: task assignment, submission, coach review, revision, versioned evidence, reassessment, next-task prescription, cross-enrollment denial, immutable assessment, priority deactivation and entered coach minutes. The separate `tests/module-import-local.test.mjs` passed 36/36 authorization and private draft checks. These results do not establish production readiness. Media Edge Function access and the existing assessment application's boundary still need authenticated integration tests.
-2. **Schema reconciliation.** The review-only SQL assumes `coaching_submission_revisions` and current `learning_modules.contentVersion`; these need verification in the isolated baseline. The existing REE proposal uses `content_version` and UUID module rows. Generic module IDs and version-pinned task assignments require a reviewed mapping and immutable published module-version storage before real writes or media authorization. The synthetic preview does not establish that mapping.
-3. **Teaching source parity.** Four structural previews have placeholder content. An authorized admin must privately import the authentic SharePoint package content and media mapping into an isolated draft environment, then complete academic parity and publication review. No private teaching assets have been copied into this repository.
-4. **Live integration.** The unified preview demonstrates decisions and revision state only. The separate local test exercises authenticated coaching RPCs, but the preview is not wired to those RPCs. Storage, generic module progress, the media Edge Function and the existing assessment application remain unverified end to end. Do not treat build or HTTP success as authenticated E2E evidence.
+- `npm run typecheck`: PASS.
+- `npm run build`: PASS; Vite emitted a non-failing bundle-size warning.
+- `node --test tests/*.test.mjs` with Supabase Local URL, anon key and JWT secret from `supabase status -o env`, plus the locally served media Edge Function: **30 passed, 0 failed**. This includes the local coaching and media integration test and `tests/module-import-local.test.mjs` **36/36** authorization/private-draft checks. The expected immutable-version rejection prints a PostgreSQL error line during the passing test.
 
-The existing four-module content specification remains the subsystem contract; module completion alone never establishes LO mastery.
+## Remaining release blockers
+
+1. The SQL is review-only. Schema/RLS/RPC and Storage ownership rules need independent security review, including the ability to delete a referenced recording and atomicity of coaching submission plus generic Verify submission. Do not apply it to the shared backend without approval and a release migration plan.
+2. Four module fixtures contain structural placeholders. Authentic SharePoint teaching content and media require authorized private import, source parity review and academic sign-off. No private teaching asset was committed.
+3. The browser flow was manually observed in Supabase Local; automated browser regression coverage and production-like deployment verification remain outstanding. The local URL works only while the local services run; it is not a hosted preview.
+
+The four-module specification remains the subsystem contract. Module completion does not imply LO mastery.
