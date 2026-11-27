@@ -5,7 +5,7 @@ export const pilotOutcomes: LearningOutcome[] = [
   { id: 'speaking-ree', version: 1, statement: 'Develop a connected Part 1 answer using Respond, Explain and Example.', successCriteria: 'A relevant 20–30 second response with a clear link between ideas.' },
   { id: 'speaking-opening', version: 1, statement: 'Use a natural opening appropriate to the question type.', successCriteria: 'An opening suited to the prompt without repeating the whole question.' },
   { id: 'speaking-self-question', version: 1, statement: 'Extend a direct answer with relevant self-questions.', successCriteria: 'One or two self-questions add a relevant new detail.' },
-  { id: 'speaking-example', version: 1, statement: 'Support a response with a specific example.', successCriteria: 'A relevant one or two sentence example states who, what or when.' },
+  { id: 'speaking-example', version: 1, statement: 'Support a response with a specific example.', successCriteria: 'A relevant one or two sentence example states WHO, WHAT AND WHEN.' },
 ];
 
 export const syntheticLearners: PilotLearner[] = [
