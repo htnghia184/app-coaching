@@ -11,12 +11,14 @@ import { CoachWorkspace } from './pages/CoachWorkspace';
 import { StudentDashboard } from './pages/StudentDashboard';
 import { StudentTaskDetail } from './pages/StudentTaskDetail';
 import { ModulePlayer } from './pages/ModulePlayer';
+import { CoachOutcomePrototype } from './pages/CoachOutcomePrototype';
 
 export default function App() {
   return (
     <>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/prototype/coach-outcomes" element={<CoachOutcomePrototype />} />
         <Route path="/" element={<RootRedirect />} />
 
         {/* Khu vực đã đăng nhập */}
