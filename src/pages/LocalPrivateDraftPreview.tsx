@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
 import { supabase } from '../lib/supabaseClient';
@@ -59,14 +59,21 @@ function DraftPlayer({ draft }: { draft: Draft }) {
   const [completed, setCompleted] = useState<string[]>([]);
   const [responses, setResponses] = useState<Record<string, Record<string,string>>>({});
   const [recordings, setRecordings] = useState<Record<string,string>>({});
+  const objectUrls = useRef<Record<string,string>>({});
+  useEffect(()=>()=>{Object.values(objectUrls.current).forEach(url=>URL.revokeObjectURL(url));},[]);
+  const saveRecording = (id:string,url:string) => {
+    if(objectUrls.current[id]) URL.revokeObjectURL(objectUrls.current[id]);
+    objectUrls.current[id]=url;
+    setRecordings(old=>({...old,[id]:url}));
+  };
   const [resetKey, setResetKey] = useState(0);
   const [finished, setFinished] = useState(false);
   const stage = manifest.stages[step];
   const units = stage.activities.flatMap(splitActivity);
-  const isPractice = stage.id === 'Practice';
+  const isPractice = stage.id === 'Practice' && units.length > 0;
   const visible = isPractice ? units.slice(unit,unit+1) : units;
   const navigate = (index: number) => { setStep(index); setUnit(0); setFinished(false); };
-  const reset = () => { setStep(0); setUnit(0); setCompleted([]); setResponses({}); setRecordings({}); setFinished(false); setResetKey(x=>x+1); };
+  const reset = () => { Object.values(objectUrls.current).forEach(url=>URL.revokeObjectURL(url)); objectUrls.current={}; setStep(0); setUnit(0); setCompleted([]); setResponses({}); setRecordings({}); setFinished(false); setResetKey(x=>x+1); };
   const next = () => {
     if (isPractice && unit < units.length-1) { setUnit(x=>x+1); return; }
     setCompleted(old => [...new Set([...old, stage.id])]);
@@ -83,11 +90,11 @@ function DraftPlayer({ draft }: { draft: Draft }) {
     <nav aria-label="Learning stages" className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">{manifest.stages.map((s,i)=><button key={s.id} aria-current={i===step?'step':undefined} onClick={()=>navigate(i)} className={'rounded-xl border p-3 text-left '+(i===step?'border-emblue bg-sky-50':'border-slate-200 bg-white')}><span className="block text-xs font-bold text-emblue">{completed.includes(s.id)?'✓':i+1}</span><span className="font-semibold text-master">{s.title}</span></button>)}</nav>
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_245px]">
       <section className="min-w-0 rounded-3xl border bg-white shadow-sm">
-        <header className="border-b p-6"><p className="text-xs font-bold uppercase tracking-widest text-emblue">Stage {step+1} / {manifest.stages.length}</p><h2 className="mt-2 text-2xl font-bold text-master">{stage.title}</h2>{isPractice && <p className="mt-2 text-sm text-slate-500">Interaction {Math.min(unit+1,units.length)} / {units.length}</p>}</header>
+        <header className="border-b p-6"><p className="text-xs font-bold uppercase tracking-widest text-emblue">Stage {step+1} / {manifest.stages.length}</p><h2 className="mt-2 text-2xl font-bold text-master">{stage.title}</h2>{stage.id==='Verify'&&<p className="mt-2 text-sm text-slate-600">{manifest.verifyPolicy.kind==='rubric_sum'?'Coach review: at least '+manifest.verifyPolicy.minTotal+'/8, no zero criterion, fresh recording.':'Coach review: at least '+manifest.verifyPolicy.minPass+' of '+manifest.verifyPolicy.itemIds.length+' accepted; no repeated question. Apply recordings are reused.'}</p>}{isPractice && <div className="mt-4"><p className="text-sm text-slate-500">Interaction {unit+1} / {units.length}</p><div className="mt-2 h-2 rounded-full bg-slate-100"><div className="h-2 rounded-full bg-emblue" style={{width: ((unit+1)/units.length*100)+'%'}}/></div></div>}</header>
         <div className="space-y-6 p-5 sm:p-8" key={resetKey}>
           {visible.map(({activity, key})=><div key={key} className="space-y-3">
             <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-600">{activity.instructions}</p>
-            {activity.type==='media' ? <DraftMedia activity={activity} draft={draft}/> : <GenericActivityPreview activity={activity} responses={responses[activity.id]??{}} onResponse={(id,value)=>setResponses(old=>({...old,[activity.id]:{...old[activity.id],[id]:value}}))} recordings={recordings} onRecording={(id,url)=>setRecordings(old=>({...old,[id]:url}))}/>}
+            {activity.type==='media' ? <DraftMedia activity={activity} draft={draft}/> : <GenericActivityPreview polished activity={activity} responses={responses[activity.id]??{}} onResponse={(id,value)=>setResponses(old=>({...old,[activity.id]:{...old[activity.id],[id]:value}}))} recordings={recordings} onRecording={saveRecording}/>}
           </div>)}
           {finished && <p role="status" className="rounded-xl bg-sky-50 p-4 text-master">Demo complete. No mastery result or coach assessment has been recorded.</p>}
           <div className="flex flex-wrap gap-3 border-t pt-5">
