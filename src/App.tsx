@@ -5,6 +5,7 @@ import { LoginPage } from './components/LoginPage';
 import { RequireRole, RootRedirect } from './components/RequireRole';
 import { AdminEnrollment } from './pages/AdminEnrollment';
 import { AdminModules } from './pages/AdminModules';
+import { AdminStudentDemo } from './pages/AdminStudentDemo';
 import { CoachDashboard } from './pages/CoachDashboard';
 import { CoachWorkspace } from './pages/CoachWorkspace';
 import { StudentDashboard } from './pages/StudentDashboard';
@@ -33,6 +34,7 @@ export default function App() {
         <Route element={<RequireRole role="admin"><AppLayout /></RequireRole>}>
           <Route path="/admin" element={<AdminEnrollment />} />
           <Route path="/admin/modules" element={<AdminModules />} />
+          <Route path="/admin/modules/demo" element={<AdminStudentDemo />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />
