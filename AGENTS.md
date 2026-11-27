@@ -10,6 +10,12 @@
 ## Product guardrail — mandatory for feature work
 Read docs/MASTER_CONTEXT.md and docs/DECISION_LOG.md for current product intent and docs/BACKLOG.md for current scope before any module work. English Gym: coach at center, software around coach. The primary loop is diagnosis → LO prescription → weekly missions → evidence → coach review → adapt. Modules are one optional intervention, not the product or a mandatory course path. Completion is not mastery; coach may confirm LO through non-module evidence. Prefer minimal manual workflows to premature automation. The four-module spec is a proposed subsystem contract, not a global architecture or release authorization. Current pilot IELTS only, 10 paid learners gate distinct from 12-module output.
  
+## Current PR #13 corrective gate — mandatory
+- Before further feature work on the integrated pilot, read `docs/PR13_CONTRACT_RECONCILIATION_2026-11-27.md` alongside the existing source-of-truth documents. Follow its corrective implementation order and acceptance gates; it is an audit/handoff, not authority for production migration or invented academic mappings.
+- Freeze cosmetic expansion until the LO/module/task/evidence contracts are reconciled. Four provisional package-to-LO fixtures do not define cardinality. Module objectives are distinct from canonical, versioned learner LOs; module and task links support multiple outcomes, and non-module evidence is valid.
+- Reuse the existing authenticated coaching spine; technical pilot routes are validation harnesses, not a replacement product. Do not claim new commits passed checks using older test evidence.
+- Reconcile local original handoff documents before coding; report contradictions and preserve agreed decisions. Codex implements and tests, ChatGPT audits, Nhựt approves academic content. No production merge/deploy/SQL without owner approval.
+
 ## Read efficiently
 1. Read this file, then `docs/00_READ_ME_FIRST.md` (the existing mandatory task router), `docs/CODEBASE_MAP.md`, and `docs/IMPLEMENTATION_STATUS.md`. For IELTS module work also read `docs/MASTER_CONTEXT.md`, `docs/DECISION_LOG.md`, `docs/MODULE_ENGINE_SPEC.md` and `docs/CONTENT_SOURCE_MAP.md`; read `docs/BACKLOG.md` for prioritization. Follow the task-specific reading matrix in `docs/00_READ_ME_FIRST.md`; do not preload every spec for unrelated tasks.
 2. Check current HEAD and changed files since the last known commit.
