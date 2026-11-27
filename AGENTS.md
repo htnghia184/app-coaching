@@ -32,5 +32,16 @@ Read docs/MASTER_CONTEXT.md and docs/DECISION_LOG.md for current product intent 
 - Run `npm run typecheck` and `npm run build` for application changes. Report PASS/FAIL/NOT EXECUTED truthfully. Existing E2E scripts can write data: inspect before running.
 - Prefer small scoped branches and reviewed PRs. Do not claim a feature is deployed, RLS-safe, or E2E-passed without evidence.
 
+## Resource-efficient testing policy — mandatory
+- Default to static checks, targeted unit tests, SQL/RLS tests and direct API integration tests. Reuse fixtures and existing scripts.
+- Run tests for affected functionality during development; run the full regression suite at milestone completion and before release.
+- Use reusable headless Playwright scripts for critical browser E2E flows. Run scripts directly and inspect concise exit status and test summaries, not continuous AI-driven browser observations.
+- Do not launch interactive browsers for routine verification, repeat successful DOM snapshots, or capture screenshots after each successful action.
+- Collect screenshots, traces and verbose logs on failure only, except when visual evidence is specifically required.
+- Interactive browser testing is reserved for UI-specific debugging, real-device microphone behavior, responsive layout, visual QA or critical release checks not covered by automation.
+- Avoid rerunning unchanged checks unless a relevant code, dependency or environment change warrants it. Report commands and PASS/FAIL/NOT EXECUTED truthfully; expand logs only for failures.
+- Never sacrifice security, data integrity, authorization or critical workflow coverage to save tokens. Use verified isolated environments for data-writing tests; preserve existing production safeguards.
+- If the required automated test is missing, implement it once and reuse it rather than repeatedly performing the same manual browser workflow.
+
 ## Task handoff format
 Report: base/head SHA; scope and assumptions; files inspected; files changed; behavior and security implications; tests with exact commands/results; unverified items; next owner/action; PR link. Never replace uncertainty with guessed status.
