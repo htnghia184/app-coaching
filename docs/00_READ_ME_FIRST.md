@@ -32,7 +32,7 @@ Therefore:
 
 **DO NOT repeat the old database-design/migration phase.**
 
-The next task is implementation of `VERTICAL_SLICE_01.md`.
+Vertical Slice 01 is historical baseline, not the next task. For current work read MASTER_CONTEXT.md, DECISION_LOG.md and BACKLOG.md. Verify current HEAD and existing implementation first.
 
 ## 2. Source-of-Truth Precedence
 
@@ -47,7 +47,7 @@ Read these files in this order:
 If they appear to conflict, use this precedence:
 
 ### Product intent
-`PRODUCT_SPEC_V1.md`
+`MASTER_CONTEXT.md` and dated `DECISION_LOG.md` govern current approved pilot direction; `PRODUCT_SPEC_V1.md` supplies enduring product philosophy where consistent.
 
 Controls:
 - product philosophy;
@@ -64,7 +64,7 @@ These supersede any earlier conceptual database model, migration proposal, or pr
 ### Current implementation scope
 `VERTICAL_SLICE_01.md`
 
-This supersedes broader MVP screen lists when deciding **what to build now**.
+This defines the historical baseline. Current work is selected from BACKLOG.md and the explicit owner task, not a repeat of this slice.
 
 A feature being described in `PRODUCT_SPEC_V1.md` does NOT automatically mean it belongs in Vertical Slice 01.
 
@@ -191,7 +191,7 @@ The product is intended to work for programs such as:
 - Foundation/general English;
 - future English coaching tracks.
 
-Do not hard-code the entire app around one exam.
+Current pilot is IELTS-only; do not implement other tracks until approved. Do not hard-code the entire app around one exam. The module engine is a subsystem; coaching decisions and LO evidence remain central.
 
 ## 6. Application Boundary
 
@@ -327,6 +327,6 @@ After reading all source-of-truth files:
 2. inspect the old assessment repo read-only if it is locally available;
 3. identify the actual stack/context available;
 4. give a short implementation plan;
-5. proceed directly with `VERTICAL_SLICE_01.md`;
+5. proceed with the explicitly assigned current backlog item; do not repeat Vertical Slice 01;
 6. do not repeat database architecture/migration work;
 7. stop only for a genuine blocker or a change requiring human approval.
