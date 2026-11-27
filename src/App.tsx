@@ -14,6 +14,7 @@ import { ModulePlayer } from './pages/ModulePlayer';
 import { CoachOutcomePrototype } from './pages/CoachOutcomePrototype';
 import { FourModulePreview } from './pages/FourModulePreview';
 import { LocalIntegratedPilot } from './pages/LocalIntegratedPilot';
+import { LocalPrivateDraftPreview } from './pages/LocalPrivateDraftPreview';
 
 export default function App() {
   return (
@@ -24,6 +25,7 @@ export default function App() {
         <Route path="/prototype/integrated-pilot" element={<CoachOutcomePrototype />} />
         <Route path="/prototype/four-modules" element={<FourModulePreview />} />
         <Route path="/local-pilot" element={<LocalIntegratedPilot />} />
+        <Route path="/local-private-drafts" element={<LocalPrivateDraftPreview />} />
         <Route path="/" element={<RootRedirect />} />
 
         {/* Khu vực đã đăng nhập */}

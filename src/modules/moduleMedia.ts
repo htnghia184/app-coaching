@@ -17,3 +17,11 @@ export async function resolveAssignedModuleMedia(assetRef: string, taskId: strin
   }
   return data as ResolvedMedia;
 }
+
+/** Authenticated local-admin preview of an unpublished draft; no task assignment. */
+export async function resolveDraftModuleMedia(assetRef: string, moduleKey: string, contentVersion: number): Promise<ResolvedMedia> {
+  if (!import.meta.env.DEV || !/^http:\/\/(127\.0\.0\.1|localhost):54321$/.test(import.meta.env.VITE_SUPABASE_URL ?? '')) throw new Error('Local draft preview only');
+  const { data, error } = await supabase.functions.invoke('module-media-resolver', { body: { assetRef, moduleKey, contentVersion, draftPreview: true } });
+  if (error || !data || data.kind !== 'youtube' || typeof data.url !== 'string' || new URL(data.url).hostname !== 'www.youtube-nocookie.com') throw new Error('Draft media unavailable');
+  return data as ResolvedMedia;
+}

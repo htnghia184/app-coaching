@@ -78,25 +78,25 @@ create policy "version readers" on public.coaching_generic_module_versions for s
    join public.coaching_tasks t on t.id=a.task_id
    join public.coaching_weekly_plans w on w.id=t.weekly_plan_id
    join public.coaching_enrollments e on e.id=w.enrollment_id
-   where a.module_key=module_key and a.content_version=content_version
+   where a.module_key=coaching_generic_module_versions.module_key and a.content_version=coaching_generic_module_versions.content_version
    and (e.student_id=auth.uid() or e.coach_id=auth.uid())) or public.get_user_role() in ('teacher','admin'));
 create policy "assignment readers" on public.coaching_generic_task_assignments for select to authenticated
  using (exists (select 1 from public.coaching_tasks t
    join public.coaching_weekly_plans w on w.id=t.weekly_plan_id
    join public.coaching_enrollments e on e.id=w.enrollment_id
-   where t.id=task_id and (e.student_id=auth.uid() or e.coach_id=auth.uid() or public.get_user_role()='admin')));
+   where t.id=coaching_generic_task_assignments.task_id and (e.student_id=auth.uid() or e.coach_id=auth.uid() or public.get_user_role()='admin')));
 create policy "attempt readers" on public.coaching_generic_attempts for select to authenticated
  using (exists (select 1 from public.coaching_tasks t
    join public.coaching_weekly_plans w on w.id=t.weekly_plan_id
    join public.coaching_enrollments e on e.id=w.enrollment_id
-   where t.id=task_id and e.student_id=student_id
+   where t.id=coaching_generic_attempts.task_id and e.student_id=coaching_generic_attempts.student_id
    and (e.student_id=auth.uid() or e.coach_id=auth.uid() or public.get_user_role()='admin')));
 create policy "response readers" on public.coaching_generic_responses for select to authenticated
- using (exists (select 1 from public.coaching_generic_attempts a where a.id=attempt_id));
+ using (exists (select 1 from public.coaching_generic_attempts a where a.id=coaching_generic_responses.attempt_id));
 create policy "recording readers" on public.coaching_generic_recordings for select to authenticated
- using (exists (select 1 from public.coaching_generic_attempts a where a.id=attempt_id));
+ using (exists (select 1 from public.coaching_generic_attempts a where a.id=coaching_generic_recordings.attempt_id));
 create policy "submission readers" on public.coaching_generic_submissions for select to authenticated
- using (exists (select 1 from public.coaching_generic_attempts a where a.id=attempt_id));
+ using (exists (select 1 from public.coaching_generic_attempts a where a.id=coaching_generic_submissions.attempt_id));
 
 create function public.assign_generic_coaching_module(p_task uuid,p_module_key text,p_content_version integer)
 returns public.coaching_generic_task_assignments language plpgsql security definer set search_path = '' as $$
@@ -245,7 +245,7 @@ alter table public.coaching_generic_reviews enable row level security;
 revoke all on public.coaching_generic_reviews from public, anon, authenticated;
 grant select on public.coaching_generic_reviews to authenticated;
 create policy "generic review readers" on public.coaching_generic_reviews for select to authenticated
- using (exists (select 1 from public.coaching_generic_attempts a where a.id=attempt_id));
+ using (exists (select 1 from public.coaching_generic_attempts a where a.id=coaching_generic_reviews.attempt_id));
 
 create function public.review_generic_coaching_verify(p_attempt uuid,p_review jsonb)
 returns public.coaching_generic_reviews language plpgsql security definer set search_path = '' as $$

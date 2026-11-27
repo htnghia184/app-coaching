@@ -108,6 +108,7 @@ sql(`insert into public.learning_modules(id,title,program,skill,level,content,is
  ('${moduleTaskId}','${ids.plan1}','${moduleId}','lesson','Synthetic generic module');`);
 const assignment = await call('coach1', 'assign_generic_coaching_module', { p_task: moduleTaskId, p_module_key: `pilot-${run}`, p_content_version: 1 });
 assert.ifError(assignment.error);
+sql(`insert into public.coaching_generic_recording_rules(module_key,content_version,prompt_id,min_seconds,max_seconds) values ('pilot-${run}',1,'verify-prompt',20,30)`);
 const crossStart = await call('student2', 'start_generic_coaching_attempt', { p_task: moduleTaskId });
 assert.ok(crossStart.error);
 const attempt = await call('student1', 'start_generic_coaching_attempt', { p_task: moduleTaskId });
@@ -125,6 +126,7 @@ const upload = await actors.student1.client.storage.from('coaching-submissions')
 assert.ifError(upload.error);
 const recording = await call('student1', 'save_generic_coaching_recording', { p_attempt: attempt.data.id, p_prompt: 'verify-prompt', p_path: recordingPath, p_seconds: 24 });
 assert.ifError(recording.error);
+assert.ok((await call('student1', 'save_generic_coaching_recording', { p_attempt: attempt.data.id, p_prompt: 'verify-prompt', p_path: recordingPath, p_seconds: 19 })).error, 'Verify duration is enforced');
 assert.ok((await actors.student1.client.storage.from('coaching-submissions').createSignedUrl(recordingPath, 60)).data?.signedUrl);
 assert.ok((await actors.coach1.client.storage.from('coaching-submissions').createSignedUrl(recordingPath, 60)).data?.signedUrl);
 assert.ok((await actors.student2.client.storage.from('coaching-submissions').createSignedUrl(recordingPath, 60)).error);
@@ -153,24 +155,76 @@ sql(`insert into public.learning_modules(id,title,program,skill,level,content,is
  insert into public.coaching_tasks(id,weekly_plan_id,module_id,task_type,title) values
  ('${perItemTaskId}','${ids.plan1}','${perItemModuleId}','lesson','Per-item module')`);
 assert.ifError((await call('coach1', 'assign_generic_coaching_module', { p_task: perItemTaskId, p_module_key: `pilot-per-item-${run}`, p_content_version: 1 })).error);
+for (const prompt of perItemIds) sql(`insert into public.coaching_generic_recording_rules(module_key,content_version,prompt_id,min_seconds,max_seconds) values ('pilot-per-item-${run}',1,'${prompt}',10,15)`);
 const perItemAttempt = await call('student1', 'start_generic_coaching_attempt', { p_task: perItemTaskId });
 assert.ifError(perItemAttempt.error);
 for (const prompt of perItemIds) {
   const path = `${actors.student1.id}/${perItemTaskId}/${perItemAttempt.data.id}/${randomUUID()}.webm`;
   assert.ifError((await actors.student1.client.storage.from('coaching-submissions').upload(path, new Blob(['synthetic'], { type: 'audio/webm' }), { contentType: 'audio/webm' })).error);
-  assert.ifError((await call('student1', 'save_generic_coaching_recording', { p_attempt: perItemAttempt.data.id, p_prompt: prompt, p_path: path, p_seconds: 20 })).error);
+  assert.ifError((await call('student1', 'save_generic_coaching_recording', { p_attempt: perItemAttempt.data.id, p_prompt: prompt, p_path: path, p_seconds: 12 })).error);
 }
 assert.ifError((await call('student1', 'complete_generic_coaching_stage', { p_attempt: perItemAttempt.data.id, p_stage: 'Apply' })).error);
 sql(`insert into public.coaching_submissions(id,task_id,student_id,text_response) values ('${perItemSubmissionId}','${perItemTaskId}','${actors.student1.id}','Six synthetic recordings')`);
 const perItemRevisionId = sql(`select id from public.coaching_submission_revisions where submission_id='${perItemSubmissionId}' and revision_number=1`);
 assert.ifError((await call('student1', 'submit_generic_coaching_verify', { p_attempt: perItemAttempt.data.id, p_submission_revision: perItemRevisionId })).error);
 const perItemReview = await call('coach1', 'review_generic_coaching_verify', { p_attempt: perItemAttempt.data.id,
+  p_review: { reviewedItems: perItemIds, passedItems: perItemIds.slice(0, 4), repeatedItems: [] } });
+assert.ifError(perItemReview.error); assert.equal(perItemReview.data.passed, false);
+const targeted = await call('student1', 'start_generic_coaching_attempt', { p_task: perItemTaskId });
+assert.ifError(targeted.error);
+assert.equal(sql(`select count(*) from public.coaching_generic_inherited_recordings where attempt_id='${targeted.data.id}'`), '4');
+for (const prompt of perItemIds.slice(4)) {
+  const path = `${actors.student1.id}/${perItemTaskId}/${targeted.data.id}/${randomUUID()}.webm`;
+  assert.ifError((await actors.student1.client.storage.from('coaching-submissions').upload(path, new Blob(['targeted retry'], { type: 'audio/webm' }), { contentType: 'audio/webm' })).error);
+  assert.ifError((await call('student1', 'save_generic_coaching_recording', { p_attempt: targeted.data.id, p_prompt: prompt, p_path: path, p_seconds: 12 })).error);
+}
+assert.ifError((await call('student1', 'complete_generic_coaching_stage', { p_attempt: targeted.data.id, p_stage: 'Apply' })).error);
+assert.ifError((await call('student1', 'submit_generic_coaching_verify_atomic', { p_attempt: targeted.data.id, p_text_response: 'Targeted M02 revision', p_request_key: randomUUID() })).error);
+const targetedReview = await call('coach1', 'review_generic_coaching_verify', { p_attempt: targeted.data.id,
   p_review: { reviewedItems: perItemIds, passedItems: perItemIds.slice(0, 5), repeatedItems: [] } });
-assert.ifError(perItemReview.error); assert.equal(perItemReview.data.passed, true);
+assert.ifError(targetedReview.error); assert.equal(targetedReview.data.passed, true);
+assert.equal(sql(`select count(*) from public.coaching_generic_reviews where attempt_id in ('${perItemAttempt.data.id}','${targeted.data.id}')`), '2');
 const { data: versions } = await actors.student1.client.from('coaching_generic_module_versions').select('module_key,content_version').eq('module_key', `pilot-${run}`);
 assert.equal(versions.length, 1);
 const { data: hiddenVersions } = await actors.student2.client.from('coaching_generic_module_versions').select('module_key').eq('module_key', `pilot-${run}`);
 assert.equal(hiddenVersions.length, 0);
+const isolatedVersionId = randomUUID();
+const isolatedManifest = { ...manifest, contentVersion: 2 };
+sql(`insert into public.learning_modules(id,title,program,skill,level,content,is_published) values ('${isolatedVersionId}','Isolated version','IELTS','Speaking','B1','${JSON.stringify(isolatedManifest)}'::jsonb,true);
+ insert into public.coaching_generic_module_versions(module_key,content_version,module_id,manifest) values ('pilot-${run}',2,'${isolatedVersionId}','${JSON.stringify(isolatedManifest)}'::jsonb)`);
+const { data: isolatedVersions, error: isolatedVersionError } = await actors.student1.client.from('coaching_generic_module_versions').select('content_version').eq('module_key', `pilot-${run}`);
+assert.ifError(isolatedVersionError); assert.deepEqual(isolatedVersions.map(row => row.content_version), [1], 'unassigned content version hidden');
+assert.equal(sql("select has_table_privilege('authenticated','coaching_private.generic_module_draft_assessment','SELECT')"), 'f');
+assert.ok((await call('student1', 'save_generic_coaching_response', { p_attempt: perItemAttempt.data.id, p_activity: 'practice-text', p_response: { answer: 'Cross-module' } })).error, 'activity cannot cross module');
+assert.ok((await call('student1', 'save_generic_coaching_response', { p_attempt: attempt.data.id, p_activity: 'practice-text', p_response: { answer: 5 } })).error, 'typed response required');
+assert.ok((await actors.student1.client.storage.from('coaching-submissions').remove([recordingPath])).error, 'referenced storage object cannot be deleted');
+assert.ok((await actors.student1.client.storage.from('coaching-submissions').upload(recordingPath, new Blob(['replace'], { type: 'audio/webm' }), { contentType: 'audio/webm', upsert: true })).error, 'referenced storage object cannot be replaced');
+assert.throws(() => sql(`delete from public.coaching_generic_recordings where id='${recording.data.id}'`), /Recording evidence is immutable/);
+const retryTaskId = randomUUID();
+sql(`insert into public.coaching_tasks(id,weekly_plan_id,module_id,task_type,title) values ('${retryTaskId}','${ids.plan1}','${moduleId}','lesson','Atomic Verify test')`);
+assert.ifError((await call('coach1', 'assign_generic_coaching_module', { p_task: retryTaskId, p_module_key: `pilot-${run}`, p_content_version: 1 })).error);
+const retryAttempt = await call('student1', 'start_generic_coaching_attempt', { p_task: retryTaskId });
+assert.ifError(retryAttempt.error);
+assert.ifError((await call('student1', 'complete_generic_coaching_stage', { p_attempt: retryAttempt.data.id, p_stage: 'Learn' })).error);
+const partialBefore = Number(sql(`select count(*) from public.coaching_submission_revisions where task_id='${retryTaskId}'`));
+assert.ok((await call('student1', 'submit_generic_coaching_verify_atomic', { p_attempt: retryAttempt.data.id, p_text_response: 'Premature', p_request_key: randomUUID() })).error);
+assert.equal(Number(sql(`select count(*) from public.coaching_submission_revisions where task_id='${retryTaskId}'`)), partialBefore, 'failed atomic Verify leaves no revision');
+assert.ok((await call('student1', 'complete_generic_coaching_stage', { p_attempt: retryAttempt.data.id, p_stage: 'Practice' })).error, 'missing required activity response');
+assert.ifError((await call('student1', 'save_generic_coaching_response', { p_attempt: retryAttempt.data.id, p_activity: 'practice-text', p_response: { answer: 'Typed synthetic response' } })).error);
+assert.ifError((await call('student1', 'complete_generic_coaching_stage', { p_attempt: retryAttempt.data.id, p_stage: 'Practice' })).error);
+const retryPath = `${actors.student1.id}/${retryTaskId}/${retryAttempt.data.id}/${randomUUID()}.webm`;
+assert.ifError((await actors.student1.client.storage.from('coaching-submissions').upload(retryPath, new Blob(['retry'], { type: 'audio/webm' }), { contentType: 'audio/webm' })).error);
+assert.ifError((await call('student1', 'save_generic_coaching_recording', { p_attempt: retryAttempt.data.id, p_prompt: 'verify-prompt', p_path: retryPath, p_seconds: 24 })).error);
+const requestKey = randomUUID();
+const atomicArgs = { p_attempt: retryAttempt.data.id, p_text_response: 'Atomic synthetic Verify', p_request_key: requestKey };
+const concurrent = await Promise.all([call('student1', 'submit_generic_coaching_verify_atomic', atomicArgs), call('student1', 'submit_generic_coaching_verify_atomic', atomicArgs)]);
+concurrent.forEach(result => assert.ifError(result.error));
+assert.equal(concurrent[0].data.id, concurrent[1].data.id);
+assert.ifError((await call('student1', 'submit_generic_coaching_verify_atomic', atomicArgs)).error, 'same-key retry is idempotent');
+assert.ok((await call('student1', 'submit_generic_coaching_verify_atomic', { ...atomicArgs, p_text_response: 'Changed payload' })).error, 'same-key changed payload denied');
+assert.ok((await call('student1', 'submit_generic_coaching_verify_atomic', { ...atomicArgs, p_request_key: randomUUID() })).error, 'different-key retry denied');
+assert.equal(Number(sql(`select count(*) from public.coaching_submission_revisions where task_id='${retryTaskId}'`)), partialBefore + 1);
+assert.equal(sql(`select count(*) from public.coaching_generic_submissions where attempt_id='${retryAttempt.data.id}'`), '1');
 assert.throws(() => sql(`update public.coaching_generic_module_versions set manifest='{}'::jsonb where module_key='pilot-${run}' and content_version=1`), /Published module versions are immutable/);
 const mediaManifest = { moduleId: 'pilot-media-test', contentVersion: 1, stages: [{ id: 'Learn', activities: [{ id: 'media', type: 'media', payload: { kind: 'youtube', assetRef: 'private:pilot:video' } }] }] };
 let mediaModuleId = sql("select module_id from public.coaching_generic_module_versions where module_key='pilot-media-test' and content_version=1");
@@ -199,6 +253,17 @@ assert.equal((await mediaRequest(null)).status, 401);
 assert.equal((await mediaRequest('student1', { ...mediaBody, contentVersion: 2 })).status, 404);
 assert.equal((await mediaRequest('student1', { ...mediaBody, assetRef: 'private:pilot:other' })).status, 404);
 assert.equal((await mediaRequest('student1', mediaBody, 'https://unrelated.example')).status, 403);
+if (sql("select count(*) from public.coaching_generic_module_drafts where module_key='ielts-speaking-m02'")==='1') {
+  const { data: adminDrafts, error: draftError } = await actors.admin.client.from('coaching_generic_module_drafts').select('module_key');
+  assert.ifError(draftError); assert.equal(adminDrafts.length, 4);
+  const { data: studentDrafts } = await actors.student1.client.from('coaching_generic_module_drafts').select('module_key');
+  assert.equal(studentDrafts.length, 0);
+  const draftBody = { moduleKey: 'ielts-speaking-m02', contentVersion: 1, assetRef: 'private:m02:video', draftPreview: true };
+  assert.equal((await mediaRequest('admin', draftBody)).status, 200);
+  assert.equal((await mediaRequest('student1', draftBody)).status, 403);
+  assert.equal((await mediaRequest(null, draftBody)).status, 401);
+}
 console.log('PASS authenticated assignment, submission, coach review, revision, versioned evidence, reassessment, next task, cross-enrollment denial, immutable assessment, priority deactivation and coach minutes');
 console.log('PASS generic module version assignment, progress response, recording metadata and Verify submission with cross-enrollment denial');
 console.log('PASS media Edge Function student, assigned coach and admin; unrelated users, anonymous, wrong version/asset/origin denied');
+console.log('PASS hardening: cross-version RLS, typed activity, duration, recording immutability, atomic concurrency/retry, targeted M02 revision and private draft boundaries');

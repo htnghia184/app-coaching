@@ -62,3 +62,8 @@ export async function submitGenericVerify(attemptId: string, revisionId: string)
   requireLocalPilot();
   result(await supabase.rpc('submit_generic_coaching_verify', { p_attempt: attemptId, p_submission_revision: revisionId }));
 }
+
+export async function submitGenericVerifyAtomic(attemptId: string, answer: string, requestKey: string): Promise<void> {
+  requireLocalPilot();
+  result(await supabase.rpc('submit_generic_coaching_verify_atomic', { p_attempt: attemptId, p_text_response: answer, p_request_key: requestKey }));
+}
