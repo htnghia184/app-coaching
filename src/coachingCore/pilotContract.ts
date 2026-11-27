@@ -1,4 +1,4 @@
-export type EvidenceSource = 'module_attempt' | 'task_submission' | 'live_session_note';
+export type EvidenceSource = 'module_submission' | 'task_submission' | 'live_session_note';
 export type OutcomeStatus = 'not_assessed' | 'emerging' | 'developing' | 'demonstrated' | 'needs_recheck';
 
 export interface LearningOutcome {
@@ -37,6 +37,7 @@ export interface PersonalizedAssignment {
   title: string;
   reason: string;
   moduleId: string | null;
+  moduleVersion: number | null;
   evidenceExpected: EvidenceSource;
   due: string;
 }

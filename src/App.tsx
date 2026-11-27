@@ -20,6 +20,7 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/prototype/coach-outcomes" element={<CoachOutcomePrototype />} />
+        <Route path="/prototype/integrated-pilot" element={<CoachOutcomePrototype />} />
         <Route path="/prototype/four-modules" element={<FourModulePreview />} />
         <Route path="/" element={<RootRedirect />} />
 

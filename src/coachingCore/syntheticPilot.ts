@@ -12,11 +12,11 @@ export const syntheticLearners: PilotLearner[] = [
   {
     id: 'learner-a', name: 'Minh Anh', target: 'IELTS Speaking 6.5', priorityOutcomeIds: ['speaking-ree', 'speaking-example'], coachMinutesThisWeek: 42,
     assignments: [
-      { id: 'a1', learnerId: 'learner-a', outcomeId: 'speaking-ree', title: 'REE guided module and fresh answer', reason: 'Diagnostic answer was brief and ideas were disconnected.', moduleId: 'synthetic-ree-module', evidenceExpected: 'module_attempt', due: '2026-12-01' },
-      { id: 'a2', learnerId: 'learner-a', outcomeId: 'speaking-example', title: 'Record a concrete personal example', reason: 'Coach wants a specific example after the REE practice.', moduleId: null, evidenceExpected: 'task_submission', due: '2026-12-03' },
+      { id: 'a1', learnerId: 'learner-a', outcomeId: 'speaking-ree', title: 'REE guided module and fresh answer', reason: 'Diagnostic answer was brief and ideas were disconnected.', moduleId: 'ielts-speaking-m01', moduleVersion: 1, evidenceExpected: 'module_submission', due: '2026-12-01' },
+      { id: 'a2', learnerId: 'learner-a', outcomeId: 'speaking-example', title: 'Record a concrete personal example', reason: 'Coach wants a specific example after the REE practice.', moduleId: null, moduleVersion: null, evidenceExpected: 'task_submission', due: '2026-12-03' },
     ],
     evidence: [
-      { id: 'e-a1', learnerId: 'learner-a', outcomeId: 'speaking-ree', source: 'module_attempt', sourceRef: 'synthetic-attempt-a1', summary: 'Completed practice; Verify answer still needs a clearer link.', capturedAt: '2026-11-26' },
+      { id: 'e-a1', learnerId: 'learner-a', outcomeId: 'speaking-ree', source: 'module_submission', sourceRef: 'synthetic-revision-a1', summary: 'Completed practice; Verify answer still needs a clearer link.', capturedAt: '2026-11-26' },
       { id: 'e-a2', learnerId: 'learner-a', outcomeId: 'speaking-example', source: 'task_submission', sourceRef: 'synthetic-task-a2', summary: 'Audio response names a place but gives no event.', capturedAt: '2026-11-27' },
     ],
     assessments: [
@@ -26,8 +26,8 @@ export const syntheticLearners: PilotLearner[] = [
   {
     id: 'learner-b', name: 'Quang Huy', target: 'IELTS Speaking 6.5', priorityOutcomeIds: ['speaking-opening', 'speaking-self-question'], coachMinutesThisWeek: 28,
     assignments: [
-      { id: 'b1', learnerId: 'learner-b', outcomeId: 'speaking-opening', title: 'Apply six natural openings', reason: 'Diagnostic answers repeated each question verbatim.', moduleId: 'synthetic-opening-module', evidenceExpected: 'module_attempt', due: '2026-12-02' },
-      { id: 'b2', learnerId: 'learner-b', outcomeId: 'speaking-self-question', title: 'Live coaching: expand a direct answer', reason: 'Coach can prompt and observe spontaneous detail in session.', moduleId: null, evidenceExpected: 'live_session_note', due: '2026-12-04' },
+      { id: 'b1', learnerId: 'learner-b', outcomeId: 'speaking-opening', title: 'Apply six natural openings', reason: 'Diagnostic answers repeated each question verbatim.', moduleId: 'ielts-speaking-m02', moduleVersion: 1, evidenceExpected: 'module_submission', due: '2026-12-02' },
+      { id: 'b2', learnerId: 'learner-b', outcomeId: 'speaking-self-question', title: 'Live coaching: expand a direct answer', reason: 'Coach can prompt and observe spontaneous detail in session.', moduleId: null, moduleVersion: null, evidenceExpected: 'live_session_note', due: '2026-12-04' },
     ],
     evidence: [
       { id: 'e-b1', learnerId: 'learner-b', outcomeId: 'speaking-self-question', source: 'live_session_note', sourceRef: 'synthetic-session-b1', summary: 'Coach observed two relevant self-questions in a live conversation.', capturedAt: '2026-11-27' },

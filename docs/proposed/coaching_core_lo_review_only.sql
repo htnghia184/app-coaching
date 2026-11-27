@@ -1,5 +1,5 @@
 -- REVIEW ONLY. Never run against production without separate approval.
--- Requires proposed docs/proposed/ielts_module_engine.sql for the module-attempt FK.
+-- Independent of the legacy REE-specific coaching_module_attempts proposal.
 -- No content or learner rows are seeded. Validate in a verified isolated environment first.
 
 create table public.coaching_learning_outcomes (
@@ -18,6 +18,8 @@ create table public.coaching_enrollment_outcomes (
   priority integer not null check (priority > 0),
   rationale text not null check (length(trim(rationale)) > 0),
   checkpoint_on date,
+  active boolean not null default true,
+  deactivated_at timestamptz,
   primary key (enrollment_id, outcome_id, outcome_version),
   foreign key (outcome_id, outcome_version) references public.coaching_learning_outcomes(id, version)
 );
@@ -26,7 +28,7 @@ create table public.coaching_task_outcomes (
   task_id uuid not null references public.coaching_tasks(id),
   outcome_id text not null,
   outcome_version integer not null,
-  evidence_expected text not null check (evidence_expected in ('task_submission','module_attempt','live_session_note')),
+  evidence_expected text not null check (evidence_expected in ('task_submission','module_submission','live_session_note')),
   primary key (task_id, outcome_id, outcome_version),
   foreign key (outcome_id, outcome_version) references public.coaching_learning_outcomes(id, version)
 );
@@ -36,13 +38,19 @@ create table public.coaching_outcome_evidence (
   enrollment_id uuid not null references public.coaching_enrollments(id),
   outcome_id text not null,
   outcome_version integer not null,
+  source_type text not null check (source_type in ('task_submission','module_submission','live_session_note')),
   submission_revision_id uuid references public.coaching_submission_revisions(id),
-  module_attempt_id uuid references public.coaching_module_attempts(id),
+  module_id uuid references public.learning_modules(id),
+  module_content_version integer check (module_content_version > 0),
   live_session_id uuid references public.coaching_sessions(id),
   summary text not null check (length(trim(summary)) > 0),
   captured_at timestamptz not null default now(),
   foreign key (outcome_id, outcome_version) references public.coaching_learning_outcomes(id, version),
-  check (num_nonnulls(submission_revision_id, module_attempt_id, live_session_id) = 1)
+  check (
+    (source_type = 'task_submission' and submission_revision_id is not null and module_id is null and module_content_version is null and live_session_id is null)
+    or (source_type = 'module_submission' and submission_revision_id is not null and module_id is not null and module_content_version is not null and live_session_id is null)
+    or (source_type = 'live_session_note' and live_session_id is not null and submission_revision_id is null and module_id is null and module_content_version is null)
+  )
 );
 
 create table public.coaching_outcome_assessments (
@@ -133,34 +141,39 @@ create policy "work log coach readers" on public.coaching_work_logs
 create schema if not exists coaching_private;
 revoke all on schema coaching_private from public, anon, authenticated;
 create function coaching_private.valid_outcome_source(
-  p_enrollment uuid, p_revision uuid, p_attempt uuid, p_session uuid
+  p_enrollment uuid, p_source_type text, p_revision uuid,
+  p_module uuid, p_module_version integer, p_session uuid
 ) returns boolean language sql stable security definer set search_path = ''
 as $$
   select case
-    when p_revision is not null then exists (
+    when p_source_type = 'task_submission' then exists (
       select 1 from public.coaching_submission_revisions r
       join public.coaching_tasks t on t.id = r.task_id
       join public.coaching_weekly_plans w on w.id = t.weekly_plan_id
       join public.coaching_enrollments e on e.id = w.enrollment_id
-      where r.id = p_revision and e.id = p_enrollment and e.student_id = r.student_id)
-    when p_attempt is not null then exists (
-      select 1 from public.coaching_module_attempts a
-      join public.coaching_tasks t on t.id = a.task_id
+      where r.id = p_revision and t.module_id is null and e.id = p_enrollment and e.student_id = r.student_id)
+    when p_source_type = 'module_submission' then exists (
+      select 1 from public.coaching_submission_revisions r
+      join public.coaching_tasks t on t.id = r.task_id
       join public.coaching_weekly_plans w on w.id = t.weekly_plan_id
       join public.coaching_enrollments e on e.id = w.enrollment_id
-      where a.id = p_attempt and e.id = p_enrollment and e.student_id = a.student_id)
-    when p_session is not null then exists (
+      join public.learning_modules m on m.id = t.module_id
+      where r.id = p_revision and e.id = p_enrollment and e.student_id = r.student_id
+        and t.module_id = p_module and m.is_published
+        and (m.content->>'contentVersion') ~ '^[0-9]+$'
+        and (m.content->>'contentVersion')::integer = p_module_version)
+    when p_source_type = 'live_session_note' then exists (
       select 1 from public.coaching_sessions s
       join public.coaching_enrollments e on e.id = s.enrollment_id
       where s.id = p_session and e.id = p_enrollment and e.coach_id = s.coach_id
         and s.summary is not null and length(trim(s.summary)) > 0)
     else false end
 $$;
-revoke all on function coaching_private.valid_outcome_source(uuid,uuid,uuid,uuid) from public, anon, authenticated;
+revoke all on function coaching_private.valid_outcome_source(uuid,text,uuid,uuid,integer,uuid) from public, anon, authenticated;
 
 create function public.record_coaching_outcome_evidence(
   p_enrollment uuid, p_outcome text, p_version integer, p_revision uuid,
-  p_attempt uuid, p_session uuid, p_summary text
+  p_source_type text, p_module uuid, p_module_version integer, p_session uuid, p_summary text
 ) returns public.coaching_outcome_evidence
 language plpgsql security definer set search_path = ''
 as $$
@@ -171,20 +184,19 @@ begin
                    where e.id = p_enrollment and e.coach_id = auth.uid()) then
     raise exception 'Assigned coach required';
   end if;
-  if num_nonnulls(p_revision,p_attempt,p_session) <> 1
-    or not exists (select 1 from public.coaching_enrollment_outcomes o
-      where o.enrollment_id = p_enrollment and o.outcome_id = p_outcome and o.outcome_version = p_version)
-    or not coaching_private.valid_outcome_source(p_enrollment,p_revision,p_attempt,p_session) then
+  if not exists (select 1 from public.coaching_enrollment_outcomes o
+      where o.enrollment_id = p_enrollment and o.outcome_id = p_outcome and o.outcome_version = p_version and o.active)
+    or not coaching_private.valid_outcome_source(p_enrollment,p_source_type,p_revision,p_module,p_module_version,p_session) then
     raise exception 'Invalid outcome or evidence source';
   end if;
   insert into public.coaching_outcome_evidence
-    (enrollment_id,outcome_id,outcome_version,submission_revision_id,module_attempt_id,live_session_id,summary)
-  values (p_enrollment,p_outcome,p_version,p_revision,p_attempt,p_session,p_summary)
+    (enrollment_id,outcome_id,outcome_version,source_type,submission_revision_id,module_id,module_content_version,live_session_id,summary)
+  values (p_enrollment,p_outcome,p_version,p_source_type,p_revision,p_module,p_module_version,p_session,p_summary)
   returning * into v;
   return v;
 end $$;
-revoke all on function public.record_coaching_outcome_evidence(uuid,text,integer,uuid,uuid,uuid,text) from public, anon;
-grant execute on function public.record_coaching_outcome_evidence(uuid,text,integer,uuid,uuid,uuid,text) to authenticated;
+revoke all on function public.record_coaching_outcome_evidence(uuid,text,integer,uuid,text,uuid,integer,uuid,text) from public, anon;
+grant execute on function public.record_coaching_outcome_evidence(uuid,text,integer,uuid,text,uuid,integer,uuid,text) to authenticated;
 
 create function public.record_coaching_outcome_assessment(
   p_enrollment uuid, p_outcome text, p_version integer, p_status text,
@@ -237,12 +249,34 @@ begin
   values (p_enrollment,p_outcome,p_version,p_priority,p_rationale,p_checkpoint)
   on conflict (enrollment_id,outcome_id,outcome_version) do update
     set priority = excluded.priority, rationale = excluded.rationale,
-        checkpoint_on = excluded.checkpoint_on
+        checkpoint_on = excluded.checkpoint_on, active = true, deactivated_at = null
   returning * into v;
   return v;
 end $$;
 revoke all on function public.set_coaching_outcome_priority(uuid,text,integer,integer,text,date) from public, anon;
 grant execute on function public.set_coaching_outcome_priority(uuid,text,integer,integer,text,date) to authenticated;
+
+create function public.deactivate_coaching_outcome_priority(
+  p_enrollment uuid, p_outcome text, p_version integer
+) returns public.coaching_enrollment_outcomes
+language plpgsql security definer set search_path = ''
+as $$
+declare v public.coaching_enrollment_outcomes;
+begin
+  if auth.uid() is null or public.get_user_role() <> 'teacher'
+    or not exists (select 1 from public.coaching_enrollments e
+                   where e.id = p_enrollment and e.coach_id = auth.uid()) then
+    raise exception 'Assigned coach required';
+  end if;
+  update public.coaching_enrollment_outcomes
+    set active = false, deactivated_at = now()
+    where enrollment_id = p_enrollment and outcome_id = p_outcome and outcome_version = p_version
+    returning * into v;
+  if v.enrollment_id is null then raise exception 'Outcome priority not found'; end if;
+  return v;
+end $$;
+revoke all on function public.deactivate_coaching_outcome_priority(uuid,text,integer) from public, anon;
+grant execute on function public.deactivate_coaching_outcome_priority(uuid,text,integer) to authenticated;
 
 create function public.link_coaching_task_outcome(
   p_task uuid, p_outcome text, p_version integer, p_evidence_expected text
@@ -261,7 +295,7 @@ begin
   if v_enrollment is null or not exists (
     select 1 from public.coaching_enrollment_outcomes o
     where o.enrollment_id = v_enrollment and o.outcome_id = p_outcome
-      and o.outcome_version = p_version
+      and o.outcome_version = p_version and o.active
   ) then raise exception 'Assigned task and selected outcome required'; end if;
   insert into public.coaching_task_outcomes(task_id,outcome_id,outcome_version,evidence_expected)
     values(p_task,p_outcome,p_version,p_evidence_expected)

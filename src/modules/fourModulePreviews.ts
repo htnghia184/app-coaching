@@ -24,11 +24,12 @@ const policy = (code: string, applyCount: number): PublicModule['verifyPolicy'] 
 
 function build(code: string, title: string, outcome: string, minutes: number, discoverAudio: number,
   practice: PublicActivity[], applyAudio: number, reflectCount: number): PublicModule {
+  const outcomeIds: Record<string, string> = { m01: 'speaking-ree', m02: 'speaking-opening', m03: 'speaking-self-question', m04: 'speaking-example' };
   const applyIds = item('apply-audio', applyAudio).map(x => x.id);
   const draft = {
     schemaVersion: 1, moduleId: `ielts-speaking-${code}`, contentVersion: 1, title, outcomeStatement: outcome, level: 'B1',
     skill: 'Speaking', estimatedMinutes: minutes, sourceRevisionRef: `sharepoint-${code}-2026-11`,
-    outcomeIds: [`speaking-${code}`],
+    outcomeIds: [outcomeIds[code]],
     stages: [
       stage('Discover', discoverAudio ? [recording('discover', discoverAudio)] : [choice('discover-compare', 1)]),
       stage('Learn', [lesson(), media(code)]),
