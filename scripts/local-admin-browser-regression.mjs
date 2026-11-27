@@ -40,14 +40,23 @@ try {
   let count=0;
   for (let i=0;i<50;i++) { count=await evaluate("document.querySelectorAll('select option').length-1"); if (count===4) break; await delay(100); }
   assert.equal(count,4,'authenticated admin sees four unpublished drafts');
-  for (const [moduleKey,index] of [['ielts-speaking-m02',2],['ielts-speaking-m03',0],['ielts-speaking-m04',0]]) {
-    await evaluate(`(() => { const select=document.querySelector('select'); select.value=${JSON.stringify(moduleKey)}; select.dispatchEvent(new Event('change',{bubbles:true})); })()`);
-    for (let i=0;i<30;i++) { if (await evaluate(`document.querySelectorAll('button').length>${index}`)) break; await delay(100); }
-    await evaluate(`([...document.querySelectorAll('button')].filter(b=>b.textContent?.includes('Load private media'))[${index}]).click()`);
+  for (const moduleKey of ['ielts-speaking-m02','ielts-speaking-m03','ielts-speaking-m04']) {
+    const selected = await evaluate(`(() => { const select=document.querySelector('select'); const option=[...select.options].find(o=>o.value.startsWith(${JSON.stringify(moduleKey+':')})); if(!option)return false; select.value=option.value; select.dispatchEvent(new Event('change',{bubbles:true})); return true; })()`);
+    assert.ok(selected, moduleKey+' draft selectable');
+    let learn=false;
+    for(let i=0;i<30;i++){learn=await evaluate("!![...document.querySelectorAll('nav button')].find(b=>b.textContent.includes('Learn'))");if(learn)break;await delay(100);}
+    assert.ok(learn,'Learn stage available');
+    await evaluate("([...document.querySelectorAll('nav button')].find(b=>b.textContent.includes('Learn'))).click()");
     let host='';
-    for (let i=0;i<50;i++) { host=await evaluate("document.querySelector('iframe') ? new URL(document.querySelector('iframe').src).hostname : ''"); if (host) break; await delay(100); }
-    assert.equal(host,'www.youtube-nocookie.com',`${moduleKey} authorized private video`);
+    for(let i=0;i<50;i++){host=await evaluate("document.querySelector('iframe') ? new URL(document.querySelector('iframe').src).hostname : ''");if(host)break;await delay(100);}
+    assert.equal(host,'www.youtube-nocookie.com',moduleKey+' authorized private video');
   }
+  await evaluate("([...document.querySelectorAll('nav button')].find(b=>b.textContent.includes('Practice'))).click()");
+  assert.ok(await evaluate("document.body.innerText.includes('Interaction 1 /')"),'Practice displays one interaction at a time');
+  await evaluate("([...document.querySelectorAll('button')].find(b=>b.textContent.includes('Next question'))).click()");
+  assert.ok(await evaluate("document.body.innerText.includes('Interaction 2 /')"),'Practice next question');
+  await evaluate("([...document.querySelectorAll('button')].find(b=>b.textContent.includes('Reset demo'))).click()");
+  assert.ok(await evaluate("document.body.innerText.includes('Stage 1 /')"),'Reset returns to first stage');
   for (const [email, expected] of [['local-pilot-student@example.invalid','Your next action'],['local-pilot-coach@example.invalid','Coach assignment and assessment']]) {
     const result = await evaluate(`(async () => { const {supabase}=await import('/src/lib/supabaseClient.ts'); await supabase.auth.signOut(); const response=await supabase.auth.signInWithPassword({email:${JSON.stringify(email)},password:${JSON.stringify(process.env.LOCAL_PILOT_PASSWORD)}}); return response.error?.message ?? 'ok'; })()`);
     assert.equal(result,'ok');
