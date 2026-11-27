@@ -1,12 +1,12 @@
--- REVIEW ONLY. Do not execute against production. Pilot LO/evidence contract proposal.
--- Requires isolated schema/RLS tests and academic approval of four LO definitions.
--- Does not replace existing coaching tables or the separate generic module engine proposal.
+-- REVIEW ONLY. Never run against production without separate approval.
+-- Requires proposed docs/proposed/ielts_module_engine.sql for the module-attempt FK.
+-- No content or learner rows are seeded. Validate in a verified isolated environment first.
 
 create table public.coaching_learning_outcomes (
   id text not null,
   version integer not null check (version > 0),
-  statement text not null,
-  success_criteria text not null,
+  statement text not null check (length(trim(statement)) > 0),
+  success_criteria text not null check (length(trim(success_criteria)) > 0),
   active boolean not null default true,
   primary key (id, version)
 );
@@ -16,7 +16,7 @@ create table public.coaching_enrollment_outcomes (
   outcome_id text not null,
   outcome_version integer not null,
   priority integer not null check (priority > 0),
-  rationale text not null,
+  rationale text not null check (length(trim(rationale)) > 0),
   checkpoint_on date,
   primary key (enrollment_id, outcome_id, outcome_version),
   foreign key (outcome_id, outcome_version) references public.coaching_learning_outcomes(id, version)
@@ -26,7 +26,7 @@ create table public.coaching_task_outcomes (
   task_id uuid not null references public.coaching_tasks(id),
   outcome_id text not null,
   outcome_version integer not null,
-  evidence_expected text not null,
+  evidence_expected text not null check (evidence_expected in ('task_submission','module_attempt','live_session_note')),
   primary key (task_id, outcome_id, outcome_version),
   foreign key (outcome_id, outcome_version) references public.coaching_learning_outcomes(id, version)
 );
@@ -36,12 +36,13 @@ create table public.coaching_outcome_evidence (
   enrollment_id uuid not null references public.coaching_enrollments(id),
   outcome_id text not null,
   outcome_version integer not null,
-  source_type text not null check (source_type in ('task_submission','module_attempt','live_session_note')),
-  source_id uuid not null,
-  summary text not null,
+  submission_revision_id uuid references public.coaching_submission_revisions(id),
+  module_attempt_id uuid references public.coaching_module_attempts(id),
+  live_session_id uuid references public.coaching_sessions(id),
+  summary text not null check (length(trim(summary)) > 0),
   captured_at timestamptz not null default now(),
-  foreign key (outcome_id, outcome_version) references public.coaching_learning_outcomes(id, version)
-  -- TODO: source-type-specific FK validation in a privileged, narrowly checked RPC.
+  foreign key (outcome_id, outcome_version) references public.coaching_learning_outcomes(id, version),
+  check (num_nonnulls(submission_revision_id, module_attempt_id, live_session_id) = 1)
 );
 
 create table public.coaching_outcome_assessments (
@@ -50,11 +51,17 @@ create table public.coaching_outcome_assessments (
   outcome_id text not null,
   outcome_version integer not null,
   status text not null check (status in ('not_assessed','emerging','developing','demonstrated','needs_recheck')),
-  rationale text not null,
+  rationale text not null check (length(trim(rationale)) > 0),
+  feedback text not null check (length(trim(feedback)) > 0),
   assessed_by uuid not null references public.profiles(id),
   assessed_at timestamptz not null default now(),
   foreign key (outcome_id, outcome_version) references public.coaching_learning_outcomes(id, version)
-  -- TODO: append-only assessment-to-evidence join and assigned-coach RPC.
+);
+
+create table public.coaching_assessment_evidence (
+  assessment_id uuid not null references public.coaching_outcome_assessments(id) on delete restrict,
+  evidence_id uuid not null references public.coaching_outcome_evidence(id) on delete restrict,
+  primary key (assessment_id, evidence_id)
 );
 
 create table public.coaching_work_logs (
@@ -67,6 +74,224 @@ create table public.coaching_work_logs (
   note text
 );
 
--- Deliberately no grants or policies here: this file is incomplete and MUST NOT be applied.
--- Before any migration: define all RLS, least-privilege grants, immutable review history,
--- source ownership validation, and adversarial role tests in an isolated database.
+alter table public.coaching_learning_outcomes enable row level security;
+alter table public.coaching_enrollment_outcomes enable row level security;
+alter table public.coaching_task_outcomes enable row level security;
+alter table public.coaching_outcome_evidence enable row level security;
+alter table public.coaching_outcome_assessments enable row level security;
+alter table public.coaching_assessment_evidence enable row level security;
+alter table public.coaching_work_logs enable row level security;
+
+revoke all on public.coaching_learning_outcomes, public.coaching_enrollment_outcomes,
+  public.coaching_task_outcomes, public.coaching_outcome_evidence,
+  public.coaching_outcome_assessments, public.coaching_assessment_evidence,
+  public.coaching_work_logs from public, anon, authenticated;
+grant select on public.coaching_learning_outcomes, public.coaching_enrollment_outcomes,
+  public.coaching_task_outcomes, public.coaching_outcome_evidence,
+  public.coaching_outcome_assessments, public.coaching_assessment_evidence,
+  public.coaching_work_logs to authenticated;
+
+create policy "authenticated outcome catalog" on public.coaching_learning_outcomes
+  for select to authenticated using (auth.uid() is not null);
+
+-- Read access follows enrollment ownership. Direct writes remain revoked.
+create policy "enrollment outcome readers" on public.coaching_enrollment_outcomes
+  for select to authenticated using (exists (
+    select 1 from public.coaching_enrollments e where e.id = enrollment_id
+      and (e.student_id = (select auth.uid()) or e.coach_id = (select auth.uid())
+        or public.get_user_role() = 'admin')
+  ));
+create policy "task outcome readers" on public.coaching_task_outcomes
+  for select to authenticated using (exists (
+    select 1 from public.coaching_tasks t
+    join public.coaching_weekly_plans p on p.id = t.weekly_plan_id
+    join public.coaching_enrollments e on e.id = p.enrollment_id
+    where t.id = task_id and (e.student_id = (select auth.uid())
+      or e.coach_id = (select auth.uid()) or public.get_user_role() = 'admin')
+  ));
+create policy "evidence readers" on public.coaching_outcome_evidence
+  for select to authenticated using (exists (
+    select 1 from public.coaching_enrollments e where e.id = enrollment_id
+      and (e.student_id = (select auth.uid()) or e.coach_id = (select auth.uid())
+        or public.get_user_role() = 'admin')
+  ));
+create policy "assessment readers" on public.coaching_outcome_assessments
+  for select to authenticated using (exists (
+    select 1 from public.coaching_enrollments e where e.id = enrollment_id
+      and (e.student_id = (select auth.uid()) or e.coach_id = (select auth.uid())
+        or public.get_user_role() = 'admin')
+  ));
+create policy "assessment evidence readers" on public.coaching_assessment_evidence
+  for select to authenticated using (exists (
+    select 1 from public.coaching_outcome_assessments a where a.id = assessment_id
+  ));
+create policy "work log coach readers" on public.coaching_work_logs
+  for select to authenticated using (coach_id = (select auth.uid()) or public.get_user_role() = 'admin');
+
+-- All mutations are narrowly checked RPCs. This helper checks the source's actual
+-- enrollment, preventing a caller from attaching another learner's evidence.
+create schema if not exists coaching_private;
+revoke all on schema coaching_private from public, anon, authenticated;
+create function coaching_private.valid_outcome_source(
+  p_enrollment uuid, p_revision uuid, p_attempt uuid, p_session uuid
+) returns boolean language sql stable security definer set search_path = ''
+as $$
+  select case
+    when p_revision is not null then exists (
+      select 1 from public.coaching_submission_revisions r
+      join public.coaching_tasks t on t.id = r.task_id
+      join public.coaching_weekly_plans w on w.id = t.weekly_plan_id
+      join public.coaching_enrollments e on e.id = w.enrollment_id
+      where r.id = p_revision and e.id = p_enrollment and e.student_id = r.student_id)
+    when p_attempt is not null then exists (
+      select 1 from public.coaching_module_attempts a
+      join public.coaching_tasks t on t.id = a.task_id
+      join public.coaching_weekly_plans w on w.id = t.weekly_plan_id
+      join public.coaching_enrollments e on e.id = w.enrollment_id
+      where a.id = p_attempt and e.id = p_enrollment and e.student_id = a.student_id)
+    when p_session is not null then exists (
+      select 1 from public.coaching_sessions s
+      join public.coaching_enrollments e on e.id = s.enrollment_id
+      where s.id = p_session and e.id = p_enrollment and e.coach_id = s.coach_id
+        and s.summary is not null and length(trim(s.summary)) > 0)
+    else false end
+$$;
+revoke all on function coaching_private.valid_outcome_source(uuid,uuid,uuid,uuid) from public, anon, authenticated;
+
+create function public.record_coaching_outcome_evidence(
+  p_enrollment uuid, p_outcome text, p_version integer, p_revision uuid,
+  p_attempt uuid, p_session uuid, p_summary text
+) returns public.coaching_outcome_evidence
+language plpgsql security definer set search_path = ''
+as $$
+declare v public.coaching_outcome_evidence;
+begin
+  if auth.uid() is null or public.get_user_role() <> 'teacher'
+    or not exists (select 1 from public.coaching_enrollments e
+                   where e.id = p_enrollment and e.coach_id = auth.uid()) then
+    raise exception 'Assigned coach required';
+  end if;
+  if num_nonnulls(p_revision,p_attempt,p_session) <> 1
+    or not exists (select 1 from public.coaching_enrollment_outcomes o
+      where o.enrollment_id = p_enrollment and o.outcome_id = p_outcome and o.outcome_version = p_version)
+    or not coaching_private.valid_outcome_source(p_enrollment,p_revision,p_attempt,p_session) then
+    raise exception 'Invalid outcome or evidence source';
+  end if;
+  insert into public.coaching_outcome_evidence
+    (enrollment_id,outcome_id,outcome_version,submission_revision_id,module_attempt_id,live_session_id,summary)
+  values (p_enrollment,p_outcome,p_version,p_revision,p_attempt,p_session,p_summary)
+  returning * into v;
+  return v;
+end $$;
+revoke all on function public.record_coaching_outcome_evidence(uuid,text,integer,uuid,uuid,uuid,text) from public, anon;
+grant execute on function public.record_coaching_outcome_evidence(uuid,text,integer,uuid,uuid,uuid,text) to authenticated;
+
+create function public.record_coaching_outcome_assessment(
+  p_enrollment uuid, p_outcome text, p_version integer, p_status text,
+  p_rationale text, p_feedback text, p_evidence_ids uuid[]
+) returns public.coaching_outcome_assessments
+language plpgsql security definer set search_path = ''
+as $$
+declare v public.coaching_outcome_assessments;
+begin
+  if auth.uid() is null or public.get_user_role() <> 'teacher'
+    or not exists (select 1 from public.coaching_enrollments e
+                   where e.id = p_enrollment and e.coach_id = auth.uid()) then
+    raise exception 'Assigned coach required';
+  end if;
+  if coalesce(array_length(p_evidence_ids,1),0) = 0
+    or (select count(*) from unnest(p_evidence_ids) x) <>
+       (select count(distinct x) from unnest(p_evidence_ids) x)
+    or (select count(*) from public.coaching_outcome_evidence e
+        where e.id = any(p_evidence_ids) and e.enrollment_id = p_enrollment
+          and e.outcome_id = p_outcome and e.outcome_version = p_version)
+       <> array_length(p_evidence_ids,1) then
+    raise exception 'Evidence must belong to this learner and outcome';
+  end if;
+  insert into public.coaching_outcome_assessments
+    (enrollment_id,outcome_id,outcome_version,status,rationale,feedback,assessed_by)
+  values (p_enrollment,p_outcome,p_version,p_status,p_rationale,p_feedback,auth.uid())
+  returning * into v;
+  insert into public.coaching_assessment_evidence(assessment_id,evidence_id)
+  select v.id,x from unnest(p_evidence_ids) x;
+  return v;
+end $$;
+revoke all on function public.record_coaching_outcome_assessment(uuid,text,integer,text,text,text,uuid[]) from public, anon;
+grant execute on function public.record_coaching_outcome_assessment(uuid,text,integer,text,text,text,uuid[]) to authenticated;
+
+create function public.set_coaching_outcome_priority(
+  p_enrollment uuid, p_outcome text, p_version integer,
+  p_priority integer, p_rationale text, p_checkpoint date
+) returns public.coaching_enrollment_outcomes
+language plpgsql security definer set search_path = ''
+as $$
+declare v public.coaching_enrollment_outcomes;
+begin
+  if auth.uid() is null or public.get_user_role() <> 'teacher'
+    or not exists (select 1 from public.coaching_enrollments e
+                   where e.id = p_enrollment and e.coach_id = auth.uid()) then
+    raise exception 'Assigned coach required';
+  end if;
+  insert into public.coaching_enrollment_outcomes
+    (enrollment_id,outcome_id,outcome_version,priority,rationale,checkpoint_on)
+  values (p_enrollment,p_outcome,p_version,p_priority,p_rationale,p_checkpoint)
+  on conflict (enrollment_id,outcome_id,outcome_version) do update
+    set priority = excluded.priority, rationale = excluded.rationale,
+        checkpoint_on = excluded.checkpoint_on
+  returning * into v;
+  return v;
+end $$;
+revoke all on function public.set_coaching_outcome_priority(uuid,text,integer,integer,text,date) from public, anon;
+grant execute on function public.set_coaching_outcome_priority(uuid,text,integer,integer,text,date) to authenticated;
+
+create function public.link_coaching_task_outcome(
+  p_task uuid, p_outcome text, p_version integer, p_evidence_expected text
+) returns public.coaching_task_outcomes
+language plpgsql security definer set search_path = ''
+as $$
+declare v public.coaching_task_outcomes; v_enrollment uuid;
+begin
+  if auth.uid() is null or public.get_user_role() <> 'teacher' then
+    raise exception 'Coach required';
+  end if;
+  select e.id into v_enrollment from public.coaching_tasks t
+    join public.coaching_weekly_plans w on w.id = t.weekly_plan_id
+    join public.coaching_enrollments e on e.id = w.enrollment_id
+    where t.id = p_task and e.coach_id = auth.uid();
+  if v_enrollment is null or not exists (
+    select 1 from public.coaching_enrollment_outcomes o
+    where o.enrollment_id = v_enrollment and o.outcome_id = p_outcome
+      and o.outcome_version = p_version
+  ) then raise exception 'Assigned task and selected outcome required'; end if;
+  insert into public.coaching_task_outcomes(task_id,outcome_id,outcome_version,evidence_expected)
+    values(p_task,p_outcome,p_version,p_evidence_expected)
+  on conflict (task_id,outcome_id,outcome_version) do update
+    set evidence_expected = excluded.evidence_expected returning * into v;
+  return v;
+end $$;
+revoke all on function public.link_coaching_task_outcome(uuid,text,integer,text) from public, anon;
+grant execute on function public.link_coaching_task_outcome(uuid,text,integer,text) to authenticated;
+
+create function public.record_coaching_work(
+  p_enrollment uuid, p_type text, p_minutes integer, p_day date, p_note text
+) returns public.coaching_work_logs
+language plpgsql security definer set search_path = ''
+as $$
+declare v public.coaching_work_logs;
+begin
+  if auth.uid() is null or public.get_user_role() <> 'teacher'
+    or not exists (select 1 from public.coaching_enrollments e
+                   where e.id = p_enrollment and e.coach_id = auth.uid()) then
+    raise exception 'Assigned coach required';
+  end if;
+  insert into public.coaching_work_logs(enrollment_id,coach_id,work_type,minutes,occurred_on,note)
+    values(p_enrollment,auth.uid(),p_type,p_minutes,p_day,p_note)
+    returning * into v;
+  return v;
+end $$;
+revoke all on function public.record_coaching_work(uuid,text,integer,date,text) from public, anon;
+grant execute on function public.record_coaching_work(uuid,text,integer,date,text) to authenticated;
+
+-- Before approval: isolated tests must cover student, assigned/unassigned coach,
+-- admin, anonymous users, cross-enrollment sources, duplicate evidence,
+-- reassessment history and failed/rolled-back RPCs. No production execution.

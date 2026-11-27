@@ -25,6 +25,7 @@ export interface CoachAssessment {
   status: OutcomeStatus;
   evidenceIds: string[];
   rationale: string;
+  feedback?: string;
   assessedAt: string;
   coachId: string;
 }
