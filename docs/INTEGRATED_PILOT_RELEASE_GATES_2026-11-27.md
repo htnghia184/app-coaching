@@ -30,3 +30,9 @@ Branch `codex/integrated-coaching-pilot-20261127` remains a draft integration of
 3. Automated browser coverage currently verifies authentication, role boundaries and private draft videos; the full assign → revise → reassess workflow was manually observed previously and is not yet an automated browser regression. Production-like deployment remains unverified. Local URLs work only while local services run.
 
 The four-module specification remains the subsystem contract. Module completion does not imply LO mastery.
+
+## Coach-first UI correction (owner review)
+
+The existing review-only LO schema already permits zero or more outcome links per task via the composite primary key (task_id, outcome_id, outcome_version). The local UI now separates setting learner priorities from task creation; selecting a module is optional; task targets may be multiple active learner priorities; assessment selects an individual linked outcome and its actual version. Task creation no longer overwrites learner priorities. This is a frontend change only; no database migration or production execution.
+
+Remaining before release: make task creation plus all outcome links and workload logging transactional/idempotent (currently separate RPCs); validate zero/multiple targets and separate assessments in isolated tests; implement versioned optional module-to-LO recommendation mapping with academic approval (not a one-to-one constraint); surface longitudinal LO evidence and assessment history, including live-session evidence, independently of task review. Existing one-module-per-task resource model is retained, and multiple tasks can use different modules for the same LO. No inferred mastery from module completion. New UI changes are not yet runtime verified; older PASS evidence applies to earlier commits only.
