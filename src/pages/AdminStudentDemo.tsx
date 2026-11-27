@@ -27,6 +27,8 @@ export function AdminStudentDemo() {
   const [learnTab, setLearnTab] = useState(0);
   const [showLearnNotes, setShowLearnNotes] = useState(false);
   const [genericView, setGenericView] = useState(false);
+  const [videoInput, setVideoInput] = useState(() => new URLSearchParams(window.location.hash.slice(1)).get('video') ?? '');
+  const videoId = /^(?:https:\/\/(?:www\.)?(?:youtu\.be\/|youtube\.com\/watch\?v=))?([A-Za-z0-9_-]{11})$/.exec(videoInput.trim())?.[1];
   const stage = STAGES[step];
   const next = () => {
     setCompleted((old) => old.includes(stage) ? old : [...old, stage]);
@@ -137,19 +139,16 @@ export function AdminStudentDemo() {
               </div>
             </section>}
             {stage === 'Learn' && <section className="space-y-7">
-              <div className="overflow-hidden rounded-3xl bg-[#142b4f]">
-                <div className="flex aspect-video flex-col items-center justify-center gap-4 bg-[radial-gradient(circle_at_50%_30%,#315d93,#142b4f_70%)] px-6 text-center text-white">
-                  <div className="flex h-20 w-20 items-center justify-center rounded-full border border-white/30 bg-white/10 text-4xl">▶</div>
-                  <p className="text-xl font-bold">Respond · Explain · Example</p>
-                  <p className="max-w-sm text-sm text-slate-300">Video lesson · Source access not yet verified</p>
-                </div>
-                <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 text-sm text-slate-200">
-                  <span>Motion lesson · REE framework</span>
-                  {reeManifest.assets.filter((asset) => asset.stage === 'Learn').map((asset) =>
-                    <a key={asset.id} href={asset.url} target="_blank" rel="noopener noreferrer" className="font-semibold text-sky-300 underline">Open source video ↗</a>)}
-                </div>
+              <div className="space-y-3 rounded-2xl border border-slate-200 p-4">
+                <label className="block text-sm font-semibold text-[#2A4272]">YouTube video (demo only)
+                  <input className="mt-2 w-full rounded-xl border p-3 text-sm" value={videoInput} onChange={e => setVideoInput(e.target.value)} placeholder="Paste an unlisted YouTube URL or ID" />
+                </label>
+                {videoId ? <div className="overflow-hidden rounded-2xl bg-black">
+                  <iframe key={videoId} className="aspect-video w-full" src={`https://www.youtube-nocookie.com/embed/${videoId}`} title="Learn video preview" allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowFullScreen referrerPolicy="strict-origin-when-cross-origin" />
+                  <a className="block p-3 text-sm text-white underline" href={`https://youtu.be/${videoId}`} target="_blank" rel="noopener noreferrer">Open on YouTube ↗</a>
+                </div> : <p className="text-sm text-slate-500">Paste a valid YouTube link to test playback.</p>}
+                <p className="text-xs text-slate-500">Temporary media test only. Video is not assigned to REE or saved to the server.</p>
               </div>
-              <p className="rounded-xl bg-amber-50 p-3 text-xs text-amber-800">Video chưa được xác nhận quyền phát trực tiếp cho học viên. Khung này là thiết kế preview, không phải video đang phát.</p>
               <div><p className="mb-3 text-xs font-bold uppercase tracking-widest text-slate-400">Explore the REE framework</p>
                 <div className="grid grid-cols-3 gap-2">{reeManifest.learn.layers.map((layer, i) =>
                   <button key={layer.label} type="button" onClick={() => setLearnTab(i)} aria-pressed={learnTab === i}
