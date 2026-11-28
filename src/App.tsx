@@ -15,6 +15,9 @@ import { CoachOutcomePrototype } from './pages/CoachOutcomePrototype';
 import { FourModulePreview } from './pages/FourModulePreview';
 import { LocalIntegratedPilot } from './pages/LocalIntegratedPilot';
 import { LocalPrivateDraftPreview } from './pages/LocalPrivateDraftPreview';
+import { LocalGenericModulePlayer } from './pages/LocalGenericModulePlayer';
+
+const localGenericPlayer = import.meta.env.DEV && /^http:\/\/(127\.0\.0\.1|localhost):54321$/.test(import.meta.env.VITE_SUPABASE_URL ?? '');
 
 export default function App() {
   return (
@@ -32,7 +35,7 @@ export default function App() {
         <Route element={<RequireRole role="student"><AppLayout /></RequireRole>}>
           <Route path="/student" element={<StudentDashboard />} />
           <Route path="/student/tasks/:taskId" element={<StudentTaskDetail />} />
-          <Route path="/student/modules/:taskId" element={<ModulePlayer />} />
+          <Route path="/student/modules/:taskId" element={localGenericPlayer ? <LocalGenericModulePlayer /> : <ModulePlayer />} />
         </Route>
 
         <Route element={<RequireRole role="teacher"><AppLayout /></RequireRole>}>

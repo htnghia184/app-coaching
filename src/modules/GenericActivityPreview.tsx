@@ -3,7 +3,7 @@ import type { PublicActivity } from './genericEngine';
 
 export function GenericActivityPreview({ activity, responses, onResponse, recordings, onRecording, polished = false }: {
   activity: PublicActivity; responses: Record<string,string>; onResponse: (id:string,value:string)=>void;
-  recordings: Record<string,string>; onRecording: (id:string,url:string)=>void; polished?: boolean;
+  recordings: Record<string,string>; onRecording: (id:string,url:string,seconds?:number)=>void; polished?: boolean;
 }) {
   const p = activity.payload;
   if (polished) return <LearnerActivity activity={activity} responses={responses} onResponse={onResponse} recordings={recordings} onRecording={onRecording}/>;
@@ -17,11 +17,12 @@ export function GenericActivityPreview({ activity, responses, onResponse, record
   return <article><h3 className="font-semibold">{activity.title}</h3><p className="text-sm">References existing evidence; no duplicate recording or server submission in preview.</p>{(p.evidenceItemIds as string[]).map(id => <p key={id} className="mt-2 text-sm">{id}: {recordings[id] ? <audio controls src={recordings[id]} /> : 'Recording pending'}</p>)}</article>;
 }
 
-function Recorder({ id, text, url, onRecording }: { id:string;text:string;url?:string;onRecording:(id:string,url:string)=>void }) {
+function Recorder({ id, text, url, onRecording }: { id:string;text:string;url?:string;onRecording:(id:string,url:string,seconds?:number)=>void }) {
   const [recording, setRecording] = useState(false);
   const [error, setError] = useState('');
   const recorder = useRef<MediaRecorder | null>(null);
   const chunks = useRef<Blob[]>([]);
+  const startedAt = useRef(0);
   useEffect(() => () => { if (recorder.current?.state === 'recording') recorder.current.stop(); recorder.current?.stream.getTracks().forEach(track => track.stop()); }, []);
   const start = async () => {
     setError('');
@@ -30,14 +31,14 @@ function Recorder({ id, text, url, onRecording }: { id:string;text:string;url?:s
       const media = new MediaRecorder(stream);
       recorder.current = media; chunks.current = [];
       media.ondataavailable = event => { if (event.data.size) chunks.current.push(event.data); };
-      media.onstop = () => { onRecording(id,URL.createObjectURL(new Blob(chunks.current,{type:media.mimeType}))); stream.getTracks().forEach(track => track.stop()); setRecording(false); };
-      media.start(); setRecording(true);
+      media.onstop = () => { onRecording(id,URL.createObjectURL(new Blob(chunks.current,{type:media.mimeType})),Math.max(1,Math.round((performance.now()-startedAt.current)/1000))); stream.getTracks().forEach(track => track.stop()); setRecording(false); };
+      startedAt.current=performance.now(); media.start(); setRecording(true);
     } catch { setError('Microphone unavailable or permission denied.'); }
   };
   return <div className="mt-3 rounded-lg border p-3"><p className="text-sm">{text}</p><button type="button" className="mt-2 rounded bg-master px-3 py-2 text-sm text-white" onClick={recording ? () => recorder.current?.stop() : start}>{recording ? 'Stop recording' : url ? 'Record again' : 'Record'}</button>{url && <audio className="mt-2" controls src={url} />}{error && <p role="alert" className="text-sm text-red-700">{error}</p>}</div>;
 }
 
-type PreviewProps = { activity: PublicActivity; responses: Record<string,string>; onResponse:(id:string,value:string)=>void; recordings:Record<string,string>; onRecording:(id:string,url:string)=>void };
+type PreviewProps = { activity: PublicActivity; responses: Record<string,string>; onResponse:(id:string,value:string)=>void; recordings:Record<string,string>; onRecording:(id:string,url:string,seconds?:number)=>void };
 const heading = 'text-lg font-bold text-master';
 const card = 'rounded-2xl border border-slate-200 bg-white p-4 sm:p-5';
 function LearnerActivity({activity,responses,onResponse,recordings,onRecording}:PreviewProps) {
@@ -71,7 +72,7 @@ function LearnerActivity({activity,responses,onResponse,recordings,onRecording}:
   </article>;
 }
 
-function StudioRecorder({id,text,number,target,url,onRecording}:{id:string;text:string;number:number;target?:number;url?:string;onRecording:(id:string,url:string)=>void}) {
+function StudioRecorder({id,text,number,target,url,onRecording}:{id:string;text:string;number:number;target?:number;url?:string;onRecording:(id:string,url:string,seconds?:number)=>void}) {
   const [status,setStatus]=useState<'idle'|'requesting'|'recording'>('idle');
   const [elapsed,setElapsed]=useState(0);
   const [error,setError]=useState('');
@@ -90,7 +91,7 @@ function StudioRecorder({id,text,number,target,url,onRecording}:{id:string;text:
       const rec=new MediaRecorder(audio);media.current=rec;
       const chunks:BlobPart[]=[];
       rec.ondataavailable=e=>{if(e.data.size)chunks.push(e.data);};
-      rec.onstop=()=>{audio.getTracks().forEach(t=>t.stop());stream.current=null;media.current=null;if(!alive.current)return;if(chunks.length)onRecording(id,URL.createObjectURL(new Blob(chunks,{type:rec.mimeType||'audio/webm'})));else setError('No audio captured. Try again.');setStatus('idle');};
+      rec.onstop=()=>{audio.getTracks().forEach(t=>t.stop());stream.current=null;media.current=null;if(!alive.current)return;if(chunks.length)onRecording(id,URL.createObjectURL(new Blob(chunks,{type:rec.mimeType||'audio/webm'})),Math.max(1,Math.round((performance.now()-startTime.current)/1000)));else setError('No audio captured. Try again.');setStatus('idle');};
       startTime.current=performance.now();setElapsed(0);rec.start();setStatus('recording');
     }catch{stream.current?.getTracks().forEach(t=>t.stop());stream.current=null;if(alive.current){setError('Microphone unavailable or permission denied. Check browser permissions.');setStatus('idle');}}
   };

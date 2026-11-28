@@ -1,5 +1,6 @@
 export type EvidenceSource = 'module_submission' | 'task_submission' | 'live_session_note';
 export type OutcomeStatus = 'not_assessed' | 'emerging' | 'developing' | 'demonstrated' | 'needs_recheck';
+export interface OutcomeRef { id: string; version: number }
 
 export interface LearningOutcome {
   id: string;
@@ -12,6 +13,7 @@ export interface CoachingEvidence {
   id: string;
   learnerId: string;
   outcomeId: string;
+  outcomeVersion: number;
   source: EvidenceSource;
   sourceRef: string;
   summary: string;
@@ -22,6 +24,7 @@ export interface CoachAssessment {
   id: string;
   learnerId: string;
   outcomeId: string;
+  outcomeVersion: number;
   status: OutcomeStatus;
   evidenceIds: string[];
   rationale: string;
@@ -33,7 +36,7 @@ export interface CoachAssessment {
 export interface PersonalizedAssignment {
   id: string;
   learnerId: string;
-  outcomeId: string;
+  outcomes: OutcomeRef[];
   title: string;
   reason: string;
   moduleId: string | null;
@@ -46,7 +49,7 @@ export interface PilotLearner {
   id: string;
   name: string;
   target: string;
-  priorityOutcomeIds: string[];
+  priorityOutcomes: OutcomeRef[];
   assignments: PersonalizedAssignment[];
   evidence: CoachingEvidence[];
   assessments: CoachAssessment[];

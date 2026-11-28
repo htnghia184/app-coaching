@@ -23,7 +23,8 @@ if (signIn.error) signIn = await admin.auth.signUp({ email: 'local-pilot-admin@e
 assert.ifError(signIn.error);
 sql(`update public.profiles set role='admin' where id=${quote(signIn.data.user.id)};`);
 const modules = ['01','02','03','04'].map(number => {
-  const manifest = parsePublicModule(JSON.parse(fs.readFileSync(path.join(source, 'learner-manifests', `m${number}.json`), 'utf8')));
+  const manifest = JSON.parse(fs.readFileSync(path.join(source, 'learner-manifests', `m${number}.json`), 'utf8'));
+  parsePublicModule(manifest); // validate while retaining original unpublished bytes
   const assessment = JSON.parse(fs.readFileSync(path.join(source, 'private-assessment', `m${number}.json`), 'utf8'));
   assert.ok(assessment && typeof assessment === 'object' && !Array.isArray(assessment));
   return { manifest, assessment };

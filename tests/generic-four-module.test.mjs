@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { fourModulePreviews } from '../src/modules/fourModulePreviews.ts';
-import { parsePublicModule, evaluateVerify } from '../src/modules/genericEngine.ts';
+import { parsePublicModule, evaluateVerify, activityResponse } from '../src/modules/genericEngine.ts';
 
 test('four source-shaped previews parse and cover all eight activity families', () => {
   assert.equal(fourModulePreviews.length, 4);
@@ -11,6 +11,18 @@ test('four source-shaped previews parse and cover all eight activity families', 
   assert.ok(fourModulePreviews.every(m => m.stages.map(s => s.id).join(',') === 'Discover,Learn,Practice,Apply,Reflect,Verify'));
   assert.match(fourModulePreviews[3].outcomeStatement, /WHO, WHAT AND WHEN/);
   assert.equal(fourModulePreviews[3].stages[0].activities.some(a => a.type === 'recording'), false);
+});
+
+test('synthetic module links are versioned many-to-many and objective stays separate', () => {
+  assert.equal(fourModulePreviews[0].outcomes.length, 2);
+  assert.equal(fourModulePreviews.filter(m => m.outcomes.some(ref => ref.id === 'speaking-ree' && ref.version === 1)).length, 2);
+  assert.ok(fourModulePreviews[0].outcomeStatement);
+  const unlinked = structuredClone(fourModulePreviews[0]); unlinked.outcomes = [];
+  assert.equal(parsePublicModule(unlinked).outcomes.length, 0);
+  const duplicate = structuredClone(fourModulePreviews[0]); duplicate.outcomes.push(duplicate.outcomes[0]);
+  assert.throws(() => parsePublicModule(duplicate), /unique/);
+  const legacy = structuredClone(fourModulePreviews[0]); legacy.schemaVersion = 1; legacy.outcomeIds = ['provisional-only']; delete legacy.outcomes;
+  assert.deepEqual(parsePublicModule(legacy).outcomes, [], 'legacy provisional ID does not become approved mapping');
 });
 
 test('structural source counts and Verify differences remain visible', () => {
@@ -44,4 +56,9 @@ test('module policy simulation separates completion from coach mastery', () => {
   assert.equal(evaluateVerify(perItem, { reviewedItems: ids, passedItems: ids.slice(0,5), repeatedItems: [] }), true);
   assert.equal(evaluateVerify(perItem, { reviewedItems: ids.slice(0,5), passedItems: ids.slice(0,5), repeatedItems: [] }), false);
   assert.equal(evaluateVerify(perItem, { reviewedItems: ids, passedItems: ids.slice(0,5), repeatedItems: [ids[0]] }), false);
+});
+
+test('response builder scopes fields to one activity and emits typed multi-select', () => {
+  const activity = {id:'choices',type:'choice',title:'Synthetic',instructions:'Synthetic',payload:{items:[{id:'q1',prompt:'Synthetic',fields:[{id:'multi',mode:'multi',options:[{id:'a',text:'A'},{id:'b',text:'B'}]}]}]}};
+  assert.deepEqual(activityResponse(activity,{'q1-multi':'a,b',foreign:'must not leak'}),{'q1-multi':['a','b']});
 });

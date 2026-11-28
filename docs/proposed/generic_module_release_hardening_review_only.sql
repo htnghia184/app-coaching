@@ -53,11 +53,15 @@ create function coaching_private.protect_generic_recording() returns trigger
 language plpgsql set search_path='' as $$ begin
   raise exception 'Recording evidence is immutable';
 end $$;
+-- The revision-binding RPC is internal to the atomic wrapper; an authenticated
+-- caller must not bypass the transactional coaching-submission path.
+revoke execute on function public.submit_generic_coaching_verify(uuid,uuid) from authenticated;
 
 create or replace function public.save_generic_coaching_response(p_attempt uuid,p_activity text,p_response jsonb)
 returns public.coaching_generic_responses language plpgsql security definer set search_path='' as $$
 declare v public.coaching_generic_responses; activity jsonb;
 begin
+  perform 1 from public.coaching_generic_attempts a where a.id=p_attempt and a.student_id=auth.uid() for update;
   select item into activity from public.coaching_generic_attempts a
   join public.coaching_generic_module_versions m on m.module_key=a.module_key and m.content_version=a.content_version,
   lateral jsonb_array_elements(m.manifest->'stages') s,
@@ -76,6 +80,7 @@ create or replace function public.complete_generic_coaching_stage(p_attempt uuid
 returns public.coaching_generic_attempts language plpgsql security definer set search_path='' as $$
 declare v public.coaching_generic_attempts; stage jsonb; activity jsonb;
 begin
+  perform 1 from public.coaching_generic_attempts a where a.id=p_attempt and a.student_id=auth.uid() for update;
   select s into stage from public.coaching_generic_attempts a
   join public.coaching_generic_module_versions m on m.module_key=a.module_key and m.content_version=a.content_version,
   lateral jsonb_array_elements(m.manifest->'stages') s
@@ -115,35 +120,50 @@ for each row execute function coaching_private.protect_generic_storage_object();
 create function coaching_private.validate_generic_activity_response(p_activity jsonb,p_response jsonb)
 returns boolean language plpgsql immutable set search_path='' as $$
 declare kind text := p_activity->>'type'; field jsonb; item jsonb; group_item jsonb; key text; value text;
+  allowed text[] := array[]::text[]; selected jsonb;
 begin
   if jsonb_typeof(p_response)<>'object' then return false; end if;
   if kind='text_response' then
     for field in select * from jsonb_array_elements(p_activity->'payload'->'fields') loop
       key:=field->>'id'; value:=p_response->>key;
+      allowed:=array_append(allowed,key);
       if jsonb_typeof(p_response->key)<>'string' or length(btrim(value))=0 then return false; end if;
     end loop;
   elsif kind='reflection' then
     for item in select * from jsonb_array_elements(p_activity->'payload'->'items') loop
       key:=item->>'id';
+      allowed:=array_append(allowed,key);
       if p_response ? key and p_response->>key not in ('yes','no') then return false; end if;
     end loop;
   elsif kind='choice' then
     for item in select * from jsonb_array_elements(p_activity->'payload'->'items') loop
       for field in select * from jsonb_array_elements(item->'fields') loop
-        key:=item->>'id'||'-'||field->>'id'; value:=p_response->>key;
-        if jsonb_typeof(p_response->key)<>'string' or not exists (
-          select 1 from jsonb_array_elements(field->'options') o where o->>'id'=value) then return false; end if;
+        key:=(item->>'id')||'-'||(field->>'id'); value:=p_response->>key;
+        allowed:=array_append(allowed,key);
+        if field->>'mode'='single' then
+          if jsonb_typeof(p_response->key)<>'string' or not exists (
+            select 1 from jsonb_array_elements(field->'options') o where o->>'id'=value) then return false; end if;
+        elsif field->>'mode'='multi' then
+          selected:=p_response->key;
+          if jsonb_typeof(selected)<>'array' or jsonb_array_length(selected)=0
+            or (select count(distinct answer) from jsonb_array_elements_text(selected) answer)<>jsonb_array_length(selected)
+            or exists(select 1 from jsonb_array_elements_text(selected) answer
+              where not exists(select 1 from jsonb_array_elements(field->'options') o where o->>'id'=answer))
+            then return false; end if;
+        else return false; end if;
       end loop;
     end loop;
   elsif kind='matching' then
     for item in select * from jsonb_array_elements(p_activity->'payload'->'prompts') loop
       for group_item in select * from jsonb_array_elements(p_activity->'payload'->'groups') loop
-        key:=item->>'id'||'-'||group_item->>'id'; value:=p_response->>key;
+        key:=(item->>'id')||'-'||(group_item->>'id'); value:=p_response->>key;
+        allowed:=array_append(allowed,key);
         if jsonb_typeof(p_response->key)<>'string' or not exists (
           select 1 from jsonb_array_elements(group_item->'options') o where o->>'id'=value) then return false; end if;
       end loop;
     end loop;
   else return false; end if;
+  if exists(select 1 from jsonb_object_keys(p_response) supplied where not (supplied=any(allowed))) then return false; end if;
   return true;
 end $$;
 
@@ -187,6 +207,7 @@ create or replace function public.save_generic_coaching_recording(p_attempt uuid
 returns public.coaching_generic_recordings language plpgsql security definer set search_path='' as $$
 declare v public.coaching_generic_recordings; v_key text; v_version integer; v_min integer; v_max integer;
 begin
+  perform 1 from public.coaching_generic_attempts a where a.id=p_attempt and a.student_id=auth.uid() for update;
   select a.module_key,a.content_version into v_key,v_version from public.coaching_generic_attempts a
     join public.coaching_generic_module_versions m on m.module_key=a.module_key and m.content_version=a.content_version
     where a.id=p_attempt and a.student_id=auth.uid() and a.status='in_progress'
@@ -236,10 +257,14 @@ begin
     values(p_task,auth.uid(),coalesce(prior.attempt_number+1,1),v_key,v_version) returning * into v;
   if prior.status='revision_required' then
     insert into public.coaching_generic_inherited_recordings(attempt_id,prompt_id,recording_id)
-      select v.id,r.prompt_id,r.id from public.coaching_generic_recordings r
+      select v.id,accepted.prompt_id,accepted.recording_id from (
+        select r.prompt_id,r.id as recording_id from public.coaching_generic_recordings r where r.attempt_id=prior.id
+        union all
+        select i.prompt_id,i.recording_id from public.coaching_generic_inherited_recordings i where i.attempt_id=prior.id
+      ) accepted
       join public.coaching_generic_reviews review on review.attempt_id=prior.id
-      where r.attempt_id=prior.id and review.review_data->'passedItems' ? r.prompt_id
-        and not (review.review_data->'repeatedItems' ? r.prompt_id)
+      where review.review_data->'passedItems' ? accepted.prompt_id
+        and not (review.review_data->'repeatedItems' ? accepted.prompt_id)
       on conflict do nothing;
   end if;
   return v;
@@ -287,7 +312,7 @@ begin
     join public.coaching_generic_module_versions m on m.module_key=a.module_key and m.content_version=a.content_version
     join public.coaching_tasks t on t.id=a.task_id join public.coaching_weekly_plans w on w.id=t.weekly_plan_id
     join public.coaching_enrollments e on e.id=w.enrollment_id
-    where a.id=p_attempt and a.status='awaiting_review' and e.coach_id=auth.uid();
+    where a.id=p_attempt and a.status='awaiting_review' and e.coach_id=auth.uid() for update of a;
   if v_policy is null then raise exception 'Assigned pending attempt required'; end if;
   if v_policy->>'kind'='rubric_sum' then
     if jsonb_typeof(p_review->'scores')<>'array'

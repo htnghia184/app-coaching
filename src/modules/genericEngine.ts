@@ -3,8 +3,8 @@ import Ajv2020 from 'ajv/dist/2020.js';
 export type ActivityType = 'lesson' | 'media' | 'choice' | 'matching' | 'text_response' | 'recording' | 'reflection' | 'evidence_submit';
 export type PublicActivity = { id: string; type: ActivityType; title: string; instructions: string; payload: Record<string, unknown> };
 export type PublicModule = {
-  schemaVersion: 1; moduleId: string; contentVersion: number; title: string; outcomeStatement: string; level: string; skill: string;
-  estimatedMinutes: number; sourceRevisionRef: string; outcomeIds: string[];
+  schemaVersion: 2; moduleId: string; contentVersion: number; title: string; outcomeStatement: string; level: string; skill: string;
+  estimatedMinutes: number; sourceRevisionRef: string; outcomes: { id: string; version: number; statement: string }[];
   stages: { id: string; title: string; activities: PublicActivity[] }[];
   verifyPolicy: { kind: 'rubric_sum'; criteria: string[]; minTotal: number; noZero: true; freshRecording: true }
     | { kind: 'per_item_pass'; itemIds: string[]; minPass: number; noQuestionRepeat: true; reuseApply: true };
@@ -23,11 +23,11 @@ const item = { type: 'object', additionalProperties: false, required: ['id', 'te
 export const publicModuleSchema = {
   $schema: 'https://json-schema.org/draft/2020-12/schema',
   type: 'object', additionalProperties: false,
-  required: ['schemaVersion', 'moduleId', 'contentVersion', 'title', 'outcomeStatement', 'level', 'skill', 'estimatedMinutes', 'sourceRevisionRef', 'outcomeIds', 'stages', 'verifyPolicy'],
+  required: ['schemaVersion', 'moduleId', 'contentVersion', 'title', 'outcomeStatement', 'level', 'skill', 'estimatedMinutes', 'sourceRevisionRef', 'outcomes', 'stages', 'verifyPolicy'],
   properties: {
-    schemaVersion: { const: 1 }, moduleId: str, contentVersion: { type: 'integer', minimum: 1 },
+    schemaVersion: { const: 2 }, moduleId: str, contentVersion: { type: 'integer', minimum: 1 },
     title: str, outcomeStatement: str, level: str, skill: str, estimatedMinutes: { type: 'integer', minimum: 1 },
-    sourceRevisionRef: str, outcomeIds: { ...strArray, minItems: 1 },
+    sourceRevisionRef: str, outcomes: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['id','version','statement'], properties: { id: str, version: { type: 'integer', minimum: 1 }, statement: str } } },
     stages: { type: 'array', minItems: 1, items: {
       type: 'object', additionalProperties: false, required: ['id', 'title', 'activities'],
       properties: { id: str, title: str, activities: { type: 'array', items: { oneOf: [
@@ -52,8 +52,17 @@ const ajv = new Ajv2020({ allErrors: true, strict: true });
 const validate = ajv.compile(publicModuleSchema);
 
 export function parsePublicModule(value: unknown): PublicModule {
-  if (!validate(value)) throw new Error(ajv.errorsText(validate.errors));
-  const module = value as PublicModule;
+  // Existing unpublished v1 drafts retain their source bytes. The legacy
+  // one-to-one outcomeIds were provisional and cannot become academic links.
+  const candidate = value && typeof value === 'object' && !Array.isArray(value)
+    && (value as Record<string,unknown>).schemaVersion === 1
+    && Array.isArray((value as Record<string,unknown>).outcomeIds)
+    ? (() => { const { outcomeIds: _provisional, ...rest } = value as Record<string,unknown>; return { ...rest, schemaVersion: 2, outcomes: [] }; })()
+    : value;
+  if (!validate(candidate)) throw new Error(ajv.errorsText(validate.errors));
+  const module = candidate as PublicModule;
+  const outcomeKeys = module.outcomes.map(outcome => `${outcome.id}:${outcome.version}`);
+  if (new Set(outcomeKeys).size !== outcomeKeys.length) throw new Error('Versioned outcome references must be unique');
   const ids = module.stages.flatMap(stage => [stage.id, ...stage.activities.map(activity => activity.id)]);
   if (new Set(ids).size !== ids.length) throw new Error('Stage and activity IDs must be unique');
   const checkSiblingIds = (node: unknown): void => {
@@ -64,7 +73,7 @@ export function parsePublicModule(value: unknown): PublicModule {
     } else if (node && typeof node === 'object') Object.values(node).forEach(checkSiblingIds);
   };
   checkSiblingIds(value);
-  const serialized = JSON.stringify(value);
+  const serialized = JSON.stringify(candidate);
   if (/"(?:correct|answerKey|privateKey|rubricAnchors)"\s*:/.test(serialized) || /<script|javascript:/i.test(serialized)) {
     throw new Error('Private keys or active content are forbidden in public manifests');
   }
@@ -97,4 +106,17 @@ export function evaluateVerify(policy: PublicModule['verifyPolicy'], review: { s
   return policy.itemIds.every(id => review.reviewedItems?.includes(id))
     && (review.passedItems?.filter(id => policy.itemIds.includes(id)).length ?? 0) >= policy.minPass
     && !(review.repeatedItems?.some(id => policy.itemIds.includes(id)));
+}
+
+/** Build a single activity's server response from renderer state. */
+export function activityResponse(activity: PublicActivity, values: Record<string,string>): Record<string,unknown> {
+  const result: Record<string,unknown> = {};
+  const put = (key: string, value: unknown) => { if (value !== undefined) result[key]=value; };
+  if (activity.type==='choice') for (const item of activity.payload.items as {id:string;fields:{id:string;mode:string}[]}[])
+    for (const field of item.fields) { const key=`${item.id}-${field.id}`; const value=values[key]; put(key,field.mode==='multi' && value !== undefined ? value.split(',').filter(Boolean) : value); }
+  if (activity.type==='matching') for (const item of activity.payload.prompts as {id:string}[])
+    for (const group of activity.payload.groups as {id:string}[]) { const key=`${item.id}-${group.id}`; put(key,values[key]); }
+  if (activity.type==='text_response') for (const field of activity.payload.fields as {id:string}[]) put(field.id,values[field.id]);
+  if (activity.type==='reflection') for (const item of activity.payload.items as {id:string}[]) put(item.id,values[item.id]);
+  return result;
 }

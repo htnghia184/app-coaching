@@ -13,6 +13,7 @@ export function CoachOutcomePrototype() {
   const [learners, setLearners] = useState<PilotLearner[]>(() => structuredClone(syntheticLearners));
   const [selectedId, setSelectedId] = useState(syntheticLearners[0].id);
   const [outcomeId, setOutcomeId] = useState(pilotOutcomes[0].id);
+  const [targetIds, setTargetIds] = useState<string[]>([pilotOutcomes[0].id]);
   const [evidenceIds, setEvidenceIds] = useState<string[]>([]);
   const [status, setStatus] = useState<OutcomeStatus>('developing');
   const [rationale, setRationale] = useState('');
@@ -27,9 +28,9 @@ export function CoachOutcomePrototype() {
   const [view, setView] = useState<'coach' | 'student'>('coach');
   const [studentSummary, setStudentSummary] = useState('');
   const learner = learners.find(item => item.id === selectedId) as PilotLearner;
-  const matchingEvidence = learner.evidence.filter(item => item.outcomeId === outcomeId);
+  const matchingEvidence = learner.evidence.filter(item => item.outcomeId === outcomeId && item.outcomeVersion === 1);
   const nextAction = learner.assignments.at(-1);
-  const availableModules = fourModulePreviews.filter(item => item.outcomeIds.includes(outcomeId));
+  const availableModules = fourModulePreviews.filter(item => targetIds.length === 0 || item.outcomes.some(link => targetIds.includes(link.id) && link.version === 1));
   const latestAssessment = (id: string) => learner.assessments.filter(item => item.outcomeId === id).at(-1);
   const update = (change: (old: PilotLearner) => PilotLearner) => {
     try {
@@ -59,7 +60,7 @@ export function CoachOutcomePrototype() {
       <h2 className="text-xl font-semibold text-master">{learner.name} · {learner.target}</h2>
       <p className="mt-2 text-sm"><strong>Learner's next action:</strong> {nextAction?.title ?? 'Coach to prescribe a task'}</p>
       {nextAction && <p className="text-sm text-slate-600">Why: {nextAction.reason} · Due {nextAction.due}</p>}
-      <fieldset className="mt-5"><legend className="font-semibold">Priority learning outcomes</legend><div className="mt-2 grid gap-2 sm:grid-cols-2">{pilotOutcomes.map(item => <label key={item.id} className="flex gap-2 rounded-lg border border-slate-200 p-3 text-sm"><input type="checkbox" checked={learner.priorityOutcomeIds.includes(item.id)} onChange={() => update(old => setPriorities(old, old.priorityOutcomeIds.includes(item.id) ? old.priorityOutcomeIds.filter(id => id !== item.id) : [...old.priorityOutcomeIds, item.id]))} /><span>{item.statement}<small className="mt-1 block text-slate-500">{latestAssessment(item.id)?.status.replaceAll('_', ' ') ?? 'Not assessed'}</small></span></label>)}</div></fieldset>
+      <fieldset className="mt-5"><legend className="font-semibold">Priority learning outcomes</legend><div className="mt-2 grid gap-2 sm:grid-cols-2">{pilotOutcomes.map(item => <label key={item.id} className="flex gap-2 rounded-lg border border-slate-200 p-3 text-sm"><input type="checkbox" checked={learner.priorityOutcomes.some(ref => ref.id === item.id && ref.version === item.version)} onChange={() => update(old => setPriorities(old, old.priorityOutcomes.some(ref => ref.id === item.id && ref.version === item.version) ? old.priorityOutcomes.filter(ref => ref.id !== item.id || ref.version !== item.version) : [...old.priorityOutcomes, { id: item.id, version: item.version }]))} /><span>{item.statement}<small className="mt-1 block text-slate-500">{latestAssessment(item.id)?.status.replaceAll('_', ' ') ?? 'Not assessed'}</small></span></label>)}</div></fieldset>
     </section>
     <section className="rounded-xl bg-white p-5 ring-1 ring-slate-200"><h3 className="text-lg font-semibold text-master">Evidence and review</h3>
       <label className="mt-3 block text-sm">Outcome<select className="mt-1 block w-full rounded-lg border p-2" value={outcomeId} onChange={event => changeOutcome(event.target.value)}>{pilotOutcomes.map(item => <option key={item.id} value={item.id}>{item.statement}</option>)}</select></label>
@@ -68,21 +69,22 @@ export function CoachOutcomePrototype() {
       <div className="mt-4 grid gap-3 sm:grid-cols-2"><label className="text-sm">Assessment status<select className="mt-1 block w-full rounded-lg border p-2" value={status} onChange={event => setStatus(event.target.value as OutcomeStatus)}>{statuses.map(item => <option key={item} value={item}>{item.replaceAll('_', ' ')}</option>)}</select></label><label className="text-sm">Coach rationale<input className="mt-1 block w-full rounded-lg border p-2" value={rationale} onChange={event => setRationale(event.target.value)} /></label></div>
       <label className="mt-3 block text-sm">Feedback to learner<textarea className="mt-1 block w-full rounded-lg border p-2" value={feedback} onChange={event => setFeedback(event.target.value)} /></label>
       <label className="mt-3 block text-sm">Review minutes<input type="number" min="1" max="480" className="mt-1 block w-32 rounded border p-2" value={reviewMinutes} onChange={event => setReviewMinutes(event.target.value)} /></label>
-      <button type="button" className="mt-3 rounded-lg bg-master px-4 py-2 text-sm font-semibold text-white" onClick={() => update(old => recordAssessment(old, { outcomeId, status, evidenceIds, rationale, feedback, minutes: Number(reviewMinutes) }))}>Record assessment</button>
+      <button type="button" className="mt-3 rounded-lg bg-master px-4 py-2 text-sm font-semibold text-white" onClick={() => update(old => recordAssessment(old, { outcomeId, outcomeVersion: 1, status, evidenceIds, rationale, feedback, minutes: Number(reviewMinutes) }))}>Record assessment</button>
       <h4 className="mt-5 font-semibold">Assessment history</h4><ol className="mt-2 space-y-2">{learner.assessments.filter(item => item.outcomeId === outcomeId).map(item => <li key={item.id} className="rounded-lg border p-3 text-sm"><strong>{item.status.replaceAll('_', ' ')}</strong> · {item.assessedAt}<p>{item.rationale}</p>{item.feedback && <p className="text-slate-600">Feedback: {item.feedback}</p>}<small>Evidence: {item.evidenceIds.join(', ')}</small></li>)}</ol>
     </section>
     <section className="rounded-xl bg-white p-5 ring-1 ring-slate-200">
       <h3 className="text-lg font-semibold text-master">Prescribe next task</h3>
+      <fieldset className="mt-3"><legend className="text-sm font-medium">Target LOs (optional)</legend>{learner.priorityOutcomes.map(ref => <label key={`${ref.id}:${ref.version}`} className="mr-4 inline-flex gap-2 text-sm"><input type="checkbox" checked={targetIds.includes(ref.id)} onChange={() => setTargetIds(old => old.includes(ref.id) ? old.filter(id => id !== ref.id) : [...old, ref.id])} />{pilotOutcomes.find(item => item.id === ref.id)?.statement ?? ref.id} · v{ref.version}</label>)}</fieldset>
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <label className="text-sm">Title<input className="mt-1 block w-full rounded-lg border p-2" value={taskTitle} onChange={event => setTaskTitle(event.target.value)} /></label>
         <label className="text-sm">Evidence path<select className="mt-1 block w-full rounded-lg border p-2" value={taskSource} onChange={event => setTaskSource(event.target.value as EvidenceSource)}>{Object.entries(sourceLabel).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
       </div>
-      {taskSource === 'module_submission' && <label className="mt-3 block text-sm">Module for selected LO<select className="mt-1 block w-full rounded border p-2" value={selectedModuleId} onChange={event => setSelectedModuleId(event.target.value)}><option value="">Choose a module</option>{availableModules.map(item => <option key={item.moduleId} value={item.moduleId}>{item.title} · v{item.contentVersion}</option>)}</select></label>}
+      {taskSource === 'module_submission' && <label className="mt-3 block text-sm">Optional module resource<select className="mt-1 block w-full rounded border p-2" value={selectedModuleId} onChange={event => setSelectedModuleId(event.target.value)}><option value="">Choose a module</option>{availableModules.map(item => <option key={item.moduleId} value={item.moduleId}>{item.title} · v{item.contentVersion}</option>)}</select></label>}
       <label className="mt-3 block text-sm">Reason for learner<input className="mt-1 block w-full rounded-lg border p-2" value={taskReason} onChange={event => setTaskReason(event.target.value)} /></label>
       <label className="mt-3 block text-sm">Planning minutes<input type="number" min="1" max="480" className="mt-1 block w-32 rounded border p-2" value={planningMinutes} onChange={event => setPlanningMinutes(event.target.value)} /></label>
       <button type="button" className="mt-3 rounded-lg bg-master px-4 py-2 text-sm font-semibold text-white" onClick={() => {
         const selectedModule = availableModules.find(item => item.moduleId === selectedModuleId);
-        update(old => prescribeTask(old, { outcomeId, title: taskTitle, reason: taskReason,
+        update(old => prescribeTask(old, { outcomes: old.priorityOutcomes.filter(ref => targetIds.includes(ref.id)), title: taskTitle, reason: taskReason,
           moduleId: taskSource === 'module_submission' ? selectedModule?.moduleId ?? null : null,
           moduleVersion: taskSource === 'module_submission' ? selectedModule?.contentVersion ?? null : null,
           evidenceExpected: taskSource, due: '2026-12-05' }, Number(planningMinutes)));

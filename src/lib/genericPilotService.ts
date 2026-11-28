@@ -38,6 +38,15 @@ export async function assignGenericModule(taskId: string, moduleKey: string, ver
   result(await supabase.rpc('assign_generic_coaching_module', { p_task: taskId, p_module_key: moduleKey, p_content_version: version }));
 }
 
+export async function prescribeCoachingTask(input: { planId: string; title: string; reason: string; moduleKey: string | null; contentVersion: number | null; targets: { id: string; version: number }[]; minutes: number; requestKey: string }): Promise<{ id: string }> {
+  requireLocalPilot();
+  return result(await supabase.rpc('prescribe_coaching_task_atomic', {
+    p_plan: input.planId, p_title: input.title, p_reason: input.reason,
+    p_module_key: input.moduleKey, p_content_version: input.contentVersion,
+    p_targets: input.targets, p_minutes: input.minutes, p_request_key: input.requestKey,
+  }));
+}
+
 export async function startGenericAttempt(taskId: string): Promise<GenericAttempt> {
   requireLocalPilot();
   return result(await supabase.rpc('start_generic_coaching_attempt', { p_task: taskId }));
@@ -56,11 +65,6 @@ export async function completeGenericStage(attemptId: string, stage: string): Pr
 export async function saveGenericRecording(attemptId: string, promptId: string, path: string, seconds: number): Promise<void> {
   requireLocalPilot();
   result(await supabase.rpc('save_generic_coaching_recording', { p_attempt: attemptId, p_prompt: promptId, p_path: path, p_seconds: seconds }));
-}
-
-export async function submitGenericVerify(attemptId: string, revisionId: string): Promise<void> {
-  requireLocalPilot();
-  result(await supabase.rpc('submit_generic_coaching_verify', { p_attempt: attemptId, p_submission_revision: revisionId }));
 }
 
 export async function submitGenericVerifyAtomic(attemptId: string, answer: string, requestKey: string): Promise<void> {

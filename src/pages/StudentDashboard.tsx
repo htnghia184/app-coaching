@@ -35,11 +35,8 @@ import type {
 } from '../lib/types';
 import { RoadmapItemBadge, StatusBadge } from '../components/StatusBadge';
 import { Spinner } from '../components/Spinner';
-import { REE_MODULE_ID } from '../modules/ree';
 
 function taskHref(task: CoachingTask): string {
-  if (task.module_id && task.module_id !== REE_MODULE_ID && import.meta.env.DEV
-    && /^http:\/\/(127\.0\.0\.1|localhost):54321$/.test(import.meta.env.VITE_SUPABASE_URL ?? '')) return '/local-pilot';
   return task.module_id ? `/student/modules/${task.id}` : `/student/tasks/${task.id}`;
 }
 
