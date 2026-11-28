@@ -56,7 +56,9 @@ try {
   await evaluate("([...document.querySelectorAll('button')].find(b=>b.textContent.includes('Next question'))).click()");
   assert.ok(await evaluate("document.body.innerText.includes('Interaction 2 /')"),'Practice next question');
   await evaluate("([...document.querySelectorAll('button')].find(b=>b.textContent.includes('Reset demo'))).click()");
-  assert.ok(await evaluate("document.body.innerText.includes('Stage 1 /')"),'Reset returns to first stage');
+  let reset=false;
+  for(let i=0;i<30;i++){reset=await evaluate("[...document.querySelectorAll('p')].some(p=>/^Stage 1\\s*\\//.test(p.textContent))");if(reset)break;await delay(100);}
+  assert.ok(reset,'Reset returns to first stage: '+await evaluate("[...document.querySelectorAll('p')].filter(p=>p.textContent.startsWith('Stage')).map(p=>p.textContent).join(';')"));
   for (const [email, expected] of [['local-pilot-student@example.invalid','Your next action'],['local-pilot-coach@example.invalid','Coach assignment and assessment']]) {
     const result = await evaluate(`(async () => { const {supabase}=await import('/src/lib/supabaseClient.ts'); await supabase.auth.signOut(); const response=await supabase.auth.signInWithPassword({email:${JSON.stringify(email)},password:${JSON.stringify(process.env.LOCAL_PILOT_PASSWORD)}}); return response.error?.message ?? 'ok'; })()`);
     assert.equal(result,'ok');
@@ -65,11 +67,22 @@ try {
     for (let i=0;i<50;i++) { visible=await evaluate(`document.body.innerText.includes(${JSON.stringify(expected)})`); if (visible) break; await delay(100); }
     assert.ok(visible,`${email} authenticated workspace`);
     if (email.includes('student')) {
+      const taskId=execFileSync('docker',['exec','supabase_db_codex-coaching','psql','-X','-q','-U','postgres','-d','postgres','-At','-c',"select a.task_id from public.coaching_generic_task_assignments a join public.coaching_tasks t on t.id=a.task_id join public.coaching_weekly_plans p on p.id=t.weekly_plan_id join public.coaching_enrollments e on e.id=p.enrollment_id join auth.users u on u.id=e.student_id where u.email='local-pilot-student@example.invalid' order by t.created_at desc limit 1;"],{encoding:'utf8'}).trim();
+      assert.match(taskId,/^[0-9a-f-]{36}$/,'synthetic generic assignment exists');
+      await send('Page.navigate',{url:`http://127.0.0.1:5174/student/modules/${taskId}`});
+      let player=false;
+      for(let i=0;i<50;i++){player=await evaluate("document.body.innerText.includes('Content version') && document.body.innerText.includes('Module objective')");if(player)break;await delay(100);}
+      assert.ok(player,'assigned student opens generic module in existing task route');
+      const canStart=await evaluate("!![...document.querySelectorAll('button')].find(b=>b.textContent==='Start module')");
+      if(canStart){await evaluate("([...document.querySelectorAll('button')].find(b=>b.textContent==='Start module')).click()");let started=false;for(let i=0;i<50;i++){started=await evaluate("!!document.querySelector('nav[aria-label=\"Module stages\"]')");if(started)break;await delay(100);}assert.ok(started,'student attempt started');}
+      await send('Page.navigate',{url:`http://127.0.0.1:5174/student/modules/${taskId}`});
+      let resumed=false;for(let i=0;i<50;i++){resumed=await evaluate("!!document.querySelector('nav[aria-label=\"Module stages\"]')");if(resumed)break;await delay(100);}
+      assert.ok(resumed,'student attempt resumes after reload');
       await send('Page.navigate',{url:'http://127.0.0.1:5174/local-private-drafts'});
       for (let i=0;i<30;i++) { visible=await evaluate("document.body.innerText.includes('Local admin preview only.')"); if (visible) break; await delay(100); }
       assert.ok(visible,'student cannot view unpublished admin preview');
     }
   }
   ws.close();
-  console.log('PASS authenticated Chrome: admin drafts and three videos, student and coach workspace, student draft denial');
+  console.log('PASS authenticated Chrome: admin drafts and three videos, student generic task resume, coach workspace, student draft denial');
 } finally { browser.kill(); }
