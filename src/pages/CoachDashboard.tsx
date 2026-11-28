@@ -24,6 +24,8 @@ import type {
   WeeklyPlan,
 } from '../lib/types';
 import { Spinner } from '../components/Spinner';
+import { supabase } from '../lib/supabaseClient';
+import { localOutcomeEnabled } from '../components/LearnerOutcomeProfile';
 
 interface LearnerStats {
   pendingReview: number;
@@ -54,6 +56,8 @@ export function CoachDashboard() {
   const [tasks, setTasks] = useState<CoachingTask[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [roadmapEnrollmentIds, setRoadmapEnrollmentIds] = useState<Set<string>>(new Set());
+  const [outcomeAttention,setOutcomeAttention]=useState<Record<string,string[]>>({});
+  const [outcomeError,setOutcomeError]=useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -76,6 +80,30 @@ export function CoachDashboard() {
       setTasks(tasksData);
       setSubmissions(subsData);
       setRoadmapEnrollmentIds(new Set(roadmapsData.map((r) => r.enrollment_id)));
+      setOutcomeAttention({}); setOutcomeError('');
+      if(localOutcomeEnabled && enrollmentIds.length){
+        const [p,a]=await Promise.all([
+          supabase.from('coaching_enrollment_outcomes').select('enrollment_id,outcome_id,outcome_version,checkpoint_on').in('enrollment_id',enrollmentIds).eq('active',true),
+          supabase.from('coaching_outcome_assessments').select('enrollment_id,outcome_id,outcome_version,status,assessed_at').in('enrollment_id',enrollmentIds).order('assessed_at',{ascending:false})
+        ]);
+        if(p.error||a.error){setOutcomeError('Không tải được tín hiệu LO: '+(p.error?.message??a.error?.message));}
+        else{
+          const result:Record<string,string[]>={};
+          const nowLocal=new Date(); const today=[nowLocal.getFullYear(),String(nowLocal.getMonth()+1).padStart(2,'0'),String(nowLocal.getDate()).padStart(2,'0')].join('-');
+          for(const id of enrollmentIds){
+            const rows=(p.data??[]).filter(x=>x.enrollment_id===id);
+            let due=0,unassessed=0,recheck=0;
+            for(const x of rows){
+              const latest=(a.data??[]).find(y=>y.enrollment_id===id&&y.outcome_id===x.outcome_id&&y.outcome_version===x.outcome_version);
+              if(x.checkpoint_on&&x.checkpoint_on<=today&&(!latest||latest.assessed_at.slice(0,10)<x.checkpoint_on))due++;
+              if(!latest||latest.status==='not_assessed')unassessed++;
+              if(latest?.status==='needs_recheck')recheck++;
+            }
+            result[id]=[!rows.length?'Chưa thiết lập LO ưu tiên':'',due?due+' LO đến hạn đánh giá':'',unassessed?unassessed+' LO chưa đánh giá':'',recheck?recheck+' LO cần kiểm tra lại':''].filter(Boolean);
+          }
+          setOutcomeAttention(result);
+        }
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Không tải được danh sách học viên');
     } finally {
@@ -148,6 +176,8 @@ export function CoachDashboard() {
       if (enPlans.length === 0 || !hasActivePlan) {
         reasons.push({ tier: 4, label: 'Chưa có kế hoạch tuần' });
       }
+      const loReasons=outcomeAttention[en.id]??[];
+      if(loReasons.length) reasons.push({tier:4,label:loReasons.join(' · ')});
       if (reasons.length === 0) {
         reasons.push({ tier: 5, label: 'Không có việc cần xử lý' });
       }
@@ -163,7 +193,7 @@ export function CoachDashboard() {
         topTier: reasons[0].tier,
       };
     });
-  }, [enrollments, plans, tasks, submissions, roadmapEnrollmentIds]);
+  }, [enrollments, plans, tasks, submissions, roadmapEnrollmentIds, outcomeAttention]);
 
   const attention = useMemo(() => {
     return summaries
@@ -214,6 +244,7 @@ export function CoachDashboard() {
         </div>
       ) : null}
 
+      {outcomeError&&<p role="alert" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">{outcomeError}</p>}
       {/* NEEDS ATTENTION */}
       {enrollments.length > 0 ? (
         <section className="space-y-3">
@@ -244,7 +275,7 @@ export function CoachDashboard() {
                           .filter((r) => r.tier < 5)
                           .map((r) => (
                             <span
-                              key={r.tier}
+                              key={r.label}
                               className={`rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${
                                 r.tier === 1
                                   ? 'bg-sky-50 text-sky-700 ring-sky-200'
