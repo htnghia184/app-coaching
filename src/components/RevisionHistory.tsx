@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ChevronDown, ChevronRight, History as HistoryIcon, MessageSquare } from 'lucide-react';
 import type { RevisionReviewStatus, SubmissionRevision } from '../lib/types';
 import { formatDateTime } from '../lib/format';
-import { AttachmentLink } from './AttachmentLink';
+import { EvidenceAttachment } from './AttachmentLink';
 
 const REVIEW_LABEL: Record<RevisionReviewStatus, string> = {
   pending: 'Chờ chấm',
@@ -67,7 +67,7 @@ function RevisionItem({ revision }: { revision: SubmissionRevision }) {
             ) : null}
             {revision.storage_path ? (
               <div className="mt-2 flex flex-wrap items-center gap-3">
-                <AttachmentLink path={revision.storage_path} label="Mở tệp đã nộp" />
+                <EvidenceAttachment path={revision.storage_path} audio={revision.duration_seconds !== null} />
                 {revision.duration_seconds !== null ? (
                   <span className="text-xs text-slate-400">{revision.duration_seconds}s</span>
                 ) : null}

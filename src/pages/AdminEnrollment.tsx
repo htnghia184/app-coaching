@@ -8,6 +8,7 @@ import {
 import { formatDate, personLabel } from '../lib/format';
 import type { EnrollmentWithPeople, ProfileRef, ScoreData } from '../lib/types';
 import { Spinner } from '../components/Spinner';
+import { Link } from 'react-router-dom';
 
 const PROGRAM_SUGGESTIONS = ['TOEIC', 'IELTS', 'VSTEP', 'General English', 'Foundation'];
 
@@ -115,6 +116,7 @@ export function AdminEnrollment() {
   return (
     <div className="page-container space-y-8">
       <header>
+        <Link to="/admin/modules" className="float-right text-sm font-semibold text-emblue underline">Quản lý IELTS module</Link>
         <h1 className="text-xl font-semibold text-master sm:text-2xl">
           Thiết lập Coaching
         </h1>

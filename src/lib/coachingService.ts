@@ -2,6 +2,7 @@
 // Tất cả truy vấn dùng session của người dùng đang đăng nhập để RLS được thực thi.
 
 import { supabase } from './supabaseClient';
+import { coachingStoragePath } from './coachingStoragePath';
 import type {
   CoachingTask,
   Enrollment,
@@ -225,6 +226,7 @@ export async function createWeeklyPlan(
 export interface CreateTaskInput {
   weekly_plan_id: string;
   task_type: TaskType;
+  module_id?: string | null;
   title: string;
   instructions: string;
   sequence: number;
@@ -238,6 +240,7 @@ export async function createTask(input: CreateTaskInput): Promise<CoachingTask> 
     .insert({
       weekly_plan_id: input.weekly_plan_id,
       task_type: input.task_type,
+      module_id: input.module_id ?? null,
       title: input.title,
       instructions: input.instructions,
       sequence: input.sequence,
@@ -248,6 +251,41 @@ export async function createTask(input: CreateTaskInput): Promise<CoachingTask> 
     .single();
   if (error) fail(error);
   return data as CoachingTask;
+}
+
+/** Module metadata only; source answers never live in this table. */
+export interface LearningModuleSummary {
+  id: string;
+  title: string;
+  description: string;
+  program: string;
+  skill: string | null;
+  level: string | null;
+  content: Record<string, unknown>;
+  estimated_minutes: number | null;
+  is_published: boolean;
+}
+
+/** Admin-only inventory. RLS is the authority for access to drafts. */
+export async function listIeltsModulesForAdmin(): Promise<LearningModuleSummary[]> {
+  const { data, error } = await supabase
+    .from('learning_modules')
+    .select('id,title,description,program,skill,level,content,estimated_minutes,is_published')
+    .eq('program', 'IELTS')
+    .order('title');
+  if (error) fail(error);
+  return (data ?? []) as LearningModuleSummary[];
+}
+
+/** Published module metadata for the coach assignment picker. */
+export async function listPublishedModules(): Promise<{ id: string; title: string }[]> {
+  const { data, error } = await supabase
+    .from('learning_modules')
+    .select('id,title')
+    .eq('is_published', true)
+    .order('title');
+  if (error) fail(error);
+  return (data ?? []) as { id: string; title: string }[];
 }
 
 /* ------------------------------------------------------------------ */
@@ -536,11 +574,12 @@ export async function uploadCoachingFile(
   studentId: string,
   taskId: string,
   file: Blob,
-  fileName: string
+  fileName: string,
+  moduleAttemptId?: string
 ): Promise<string> {
   const ext = safeExtension(fileName, file.type);
   const unique = `${Date.now()}-${crypto.randomUUID()}${ext}`;
-  const path = `${studentId}/${taskId}/${unique}`;
+  const path = coachingStoragePath(studentId, taskId, unique, moduleAttemptId);
   const { error } = await supabase.storage
     .from(COACHING_BUCKET)
     .upload(path, file, {

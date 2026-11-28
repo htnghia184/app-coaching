@@ -41,3 +41,25 @@ export function AttachmentLink({
     </span>
   );
 }
+
+/** Private, on-demand playback. Never persist signed URLs or prefetch other learners' files. */
+export function EvidenceAttachment({path, audio=false}:{path:string;audio?:boolean}) {
+  return audio || /\.(webm|mp3|m4a|wav|ogg|aac|flac|mp4)$/i.test(path) ? <PrivateAudio key={path} path={path}/> : <AttachmentLink path={path}/>;
+}
+function PrivateAudio({path}:{path:string}) {
+  const [url,setUrl]=useState('');
+  const [busy,setBusy]=useState(false);
+  const [error,setError]=useState('');
+  const load=async()=>{
+    setBusy(true);setError('');setUrl('');
+    try{setUrl(await createSignedFileUrl(path));}
+    catch(e){setError(e instanceof Error?e.message:'Không tải được bản ghi âm');}
+    finally{setBusy(false);}
+  };
+  return <div className="w-full space-y-2">
+    <button type="button" disabled={busy} onClick={()=>void load()} className="rounded-lg border bg-white px-3 py-2 text-sm font-medium text-master disabled:opacity-50">{busy?'Đang tải…':url?'Tải lại bản ghi âm':'Nghe bản ghi âm'}</button>
+    {url&&<audio controls preload="metadata" className="w-full" src={url} onError={()=>setError('Không phát được audio. Hãy tải lại hoặc mở tệp.')}/>}
+    {error&&<p role="alert" className="text-xs text-red-700">{error}</p>}
+    <AttachmentLink path={path} label="Mở tệp riêng"/>
+  </div>;
+}

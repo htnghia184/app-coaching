@@ -4,22 +4,38 @@ import { AppNotices } from './components/AppNotices';
 import { LoginPage } from './components/LoginPage';
 import { RequireRole, RootRedirect } from './components/RequireRole';
 import { AdminEnrollment } from './pages/AdminEnrollment';
+import { AdminModules } from './pages/AdminModules';
+import { AdminStudentDemo } from './pages/AdminStudentDemo';
 import { CoachDashboard } from './pages/CoachDashboard';
 import { CoachWorkspace } from './pages/CoachWorkspace';
 import { StudentDashboard } from './pages/StudentDashboard';
 import { StudentTaskDetail } from './pages/StudentTaskDetail';
+import { ModulePlayer } from './pages/ModulePlayer';
+import { CoachOutcomePrototype } from './pages/CoachOutcomePrototype';
+import { FourModulePreview } from './pages/FourModulePreview';
+import { LocalIntegratedPilot } from './pages/LocalIntegratedPilot';
+import { LocalPrivateDraftPreview } from './pages/LocalPrivateDraftPreview';
+import { LocalGenericModulePlayer } from './pages/LocalGenericModulePlayer';
+
+const localGenericPlayer = import.meta.env.DEV && /^http:\/\/(127\.0\.0\.1|localhost):54321$/.test(import.meta.env.VITE_SUPABASE_URL ?? '');
 
 export default function App() {
   return (
     <>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/prototype/coach-outcomes" element={<CoachOutcomePrototype />} />
+        <Route path="/prototype/integrated-pilot" element={<CoachOutcomePrototype />} />
+        <Route path="/prototype/four-modules" element={<FourModulePreview />} />
+        <Route path="/local-pilot" element={<LocalIntegratedPilot />} />
+        <Route path="/local-private-drafts" element={<LocalPrivateDraftPreview />} />
         <Route path="/" element={<RootRedirect />} />
 
         {/* Khu vực đã đăng nhập */}
         <Route element={<RequireRole role="student"><AppLayout /></RequireRole>}>
           <Route path="/student" element={<StudentDashboard />} />
           <Route path="/student/tasks/:taskId" element={<StudentTaskDetail />} />
+          <Route path="/student/modules/:taskId" element={localGenericPlayer ? <LocalGenericModulePlayer /> : <ModulePlayer />} />
         </Route>
 
         <Route element={<RequireRole role="teacher"><AppLayout /></RequireRole>}>
@@ -29,6 +45,8 @@ export default function App() {
 
         <Route element={<RequireRole role="admin"><AppLayout /></RequireRole>}>
           <Route path="/admin" element={<AdminEnrollment />} />
+          <Route path="/admin/modules" element={<AdminModules />} />
+          <Route path="/admin/modules/demo" element={<AdminStudentDemo />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

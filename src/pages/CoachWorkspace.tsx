@@ -18,6 +18,7 @@ import {
   getEnrollment,
   listRoadmapItems,
   listRoadmaps,
+  listPublishedModules,
   listSubmissionRevisions,
   listSubmissionsForTasks,
   listTasksForPlans,
@@ -52,13 +53,17 @@ import type {
 } from '../lib/types';
 import { RoadmapItemBadge, SubmissionBadge } from '../components/StatusBadge';
 import { Spinner } from '../components/Spinner';
-import { AttachmentLink } from '../components/AttachmentLink';
+import { EvidenceAttachment } from '../components/AttachmentLink';
+import { LearnerOutcomeProfile, localOutcomeEnabled } from '../components/LearnerOutcomeProfile';
 import { RevisionHistory } from '../components/RevisionHistory';
+import { CoachModuleReview } from '../modules/CoachModuleReview';
+import { REE_MODULE_ID } from '../modules/ree';
 
 const inputClass =
   'w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-sm outline-none transition focus:border-emblue focus:ring-2 focus:ring-emblue/20';
 
-const TASK_TYPE_LABEL: Record<SliceTaskType, string> = {
+const TASK_TYPE_LABEL: Record<SliceTaskType | 'lesson', string> = {
+  lesson: 'IELTS micro-module',
   text: 'Text response',
   audio: 'Audio recording',
   file: 'File upload',
@@ -201,6 +206,8 @@ export function CoachWorkspace() {
         ) : null}
       </section>
 
+      {localOutcomeEnabled && <LearnerOutcomeProfile key={enrollment.id} enrollmentId={enrollment.id} revisions={revisions} tasks={tasks} />}
+
       {/* Lộ trình học tập */}
       <RoadmapPanel
         enrollmentId={enrollment.id}
@@ -210,11 +217,11 @@ export function CoachWorkspace() {
       />
 
       {/* Tạo weekly plan */}
-      <WeeklyPlanComposer
+      <div id="weekly-plan" className="scroll-mt-6"><WeeklyPlanComposer
         enrollmentId={enrollment.id}
         nextWeekNumber={nextWeekNumber}
         onCreated={load}
-      />
+      /></div>
 
       {/* Danh sách plan + task + review */}
       {plans.length === 0 ? (
@@ -909,7 +916,9 @@ function TaskRow({
       ) : null}
 
       {submission ? (
-        <ReviewPanel submission={submission} revisions={revisions ?? []} onChanged={onChanged} />
+        task.module_id === REE_MODULE_ID
+          ? <CoachModuleReview submission={submission} revisions={revisions ?? []} onChanged={onChanged} />
+          : <ReviewPanel submission={submission} revisions={revisions ?? []} onChanged={onChanged} />
       ) : (
         <p className="mt-2 text-xs text-slate-400">Học viên chưa nộp.</p>
       )}
@@ -931,13 +940,22 @@ function TaskComposer({
   onCreated: () => Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
-  const [taskType, setTaskType] = useState<SliceTaskType>('text');
+  const [taskType, setTaskType] = useState<SliceTaskType | 'lesson'>('text');
+  const [moduleId, setModuleId] = useState('');
+  const [availableModules, setAvailableModules] = useState<{ id: string; title: string }[]>([]);
   const [title, setTitle] = useState('');
   const [instructions, setInstructions] = useState('');
   const [dueAt, setDueAt] = useState('');
   const [required, setRequired] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!open) return;
+    void listPublishedModules()
+      .then((modules) => setAvailableModules(modules.filter((module) => module.id === REE_MODULE_ID)))
+      .catch(() => setAvailableModules([]));
+  }, [open]);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -946,11 +964,15 @@ function TaskComposer({
       setError('Vui lòng nhập tiêu đề task.');
       return;
     }
+    if (taskType === 'lesson' && !moduleId) {
+      setError('Chọn một module đã publish.'); return;
+    }
     setSaving(true);
     try {
       await createTask({
         weekly_plan_id: planId,
         task_type: taskType,
+        module_id: taskType === 'lesson' ? moduleId : null,
         title: title.trim(),
         instructions: instructions.trim(),
         sequence: nextSequence,
@@ -990,7 +1012,7 @@ function TaskComposer({
         <span className="mb-1.5 block text-xs font-medium text-slate-600">Loại task</span>
         <select
           value={taskType}
-          onChange={(e) => setTaskType(e.target.value as SliceTaskType)}
+          onChange={(e) => setTaskType(e.target.value as SliceTaskType | 'lesson')}
           className={inputClass}
         >
           {SLICE_TASK_TYPES.map((t) => (
@@ -998,8 +1020,17 @@ function TaskComposer({
               {TASK_TYPE_LABEL[t]}
             </option>
           ))}
+          <option value="lesson">{TASK_TYPE_LABEL.lesson}</option>
         </select>
       </label>
+      {taskType === 'lesson' && <label className="block">
+        <span className="mb-1.5 block text-xs font-medium text-slate-600">Module đã publish</span>
+        <select value={moduleId} onChange={(e) => setModuleId(e.target.value)} className={inputClass}>
+          <option value="">Chọn module</option>
+          {availableModules.map((module) => <option key={module.id} value={module.id}>{module.title}</option>)}
+        </select>
+        {availableModules.length === 0 && <span className="mt-1 block text-xs text-amber-700">Chưa có module đủ điều kiện publish.</span>}
+      </label>}
       <label className="block">
         <span className="mb-1.5 block text-xs font-medium text-slate-600">Tiêu đề</span>
         <input
@@ -1133,7 +1164,7 @@ function ReviewPanel({
         ) : null}
         {submission.storage_path ? (
           <div className="mt-2 flex flex-wrap items-center gap-3">
-            <AttachmentLink path={submission.storage_path} />
+            <EvidenceAttachment path={submission.storage_path} audio={submission.duration_seconds !== null} />
             {submission.duration_seconds !== null ? (
               <span className="text-xs text-slate-400">{submission.duration_seconds}s</span>
             ) : null}
